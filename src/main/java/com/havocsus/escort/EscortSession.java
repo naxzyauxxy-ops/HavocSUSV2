@@ -9,13 +9,6 @@ import java.util.UUID;
 
 public final class EscortSession {
 
-    public enum Type {
-        /** Tied to a SUS flag: leashed to one suspect, spectate-locked to them. */
-        ESCORT,
-        /** Free roam. No leash, spectate anyone - but the same build/command lockdown. */
-        PATROL
-    }
-
     public enum Mode {
         /** Ghost. Noclip, invisible, cannot touch anything. */
         SPECTATOR,
@@ -24,8 +17,6 @@ public final class EscortSession {
     }
 
     private final UUID staffId;
-    private final Type type;
-    /** Null for PATROL sessions - there is no suspect to anchor to. */
     private UUID targetId;
 
     // Pre-session state, restored verbatim on exit.
@@ -55,9 +46,8 @@ public final class EscortSession {
      *               them, so reading it here would record the suspect's
      *               position and send staff straight back to it on exit.
      */
-    public EscortSession(Player staff, Type type, UUID targetId, Location origin, boolean wasAlreadyVanished) {
+    public EscortSession(Player staff, UUID targetId, Location origin, boolean wasAlreadyVanished) {
         this.staffId = staff.getUniqueId();
-        this.type = type;
         this.targetId = targetId;
         this.returnLocation = (origin == null ? staff.getLocation() : origin).clone();
         this.previousGameMode = staff.getGameMode();
@@ -66,45 +56,8 @@ public final class EscortSession {
         this.wasAlreadyVanished = wasAlreadyVanished;
     }
 
-    /**
-     * Upgrades a PATROL session into a real ESCORT on a suspect.
-     *
-     * The pre-session snapshot (gamemode, flight, return point, vanish state) is
-     * carried across untouched. Rebuilding it from the live player would capture
-     * the patrol's own spectator state and leave staff stuck in spectator when
-     * they eventually quit.
-     */
-    public EscortSession convertToEscort(UUID newTarget) {
-        EscortSession converted = new EscortSession(staffId, Type.ESCORT, newTarget,
-                returnLocation, previousGameMode, previousAllowFlight, previousFlying,
-                wasAlreadyVanished);
-        converted.mode = this.mode;
-        return converted;
-    }
-
-    private EscortSession(UUID staffId, Type type, UUID targetId, Location returnLocation,
-                          GameMode previousGameMode, boolean previousAllowFlight,
-                          boolean previousFlying, boolean wasAlreadyVanished) {
-        this.staffId = staffId;
-        this.type = type;
-        this.targetId = targetId;
-        this.returnLocation = returnLocation.clone();
-        this.previousGameMode = previousGameMode;
-        this.previousAllowFlight = previousAllowFlight;
-        this.previousFlying = previousFlying;
-        this.wasAlreadyVanished = wasAlreadyVanished;
-    }
-
     public UUID staffId() {
         return staffId;
-    }
-
-    public Type type() {
-        return type;
-    }
-
-    public boolean isPatrol() {
-        return type == Type.PATROL;
     }
 
     public UUID targetId() {

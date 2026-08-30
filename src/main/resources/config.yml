@@ -59,16 +59,80 @@ sus-command:
     - help
     - history
 
-patrol:
-  # Free spectate mode: /hs spec  (aliases: /hs patrol, /escort spec)
+punish:
+  # Running /sus again while you're already watching someone opens the punish
+  # screen for them instead of the watch list.
   #
-  # This is the replacement for dropping into spectator by hand. You get
-  # vanished spectator with NO leash and NO target lock, so you can watch
-  # anyone on the server, flagged or not - but you still can't break, place,
-  # loot or run anything outside the command whitelist.
-  #
-  # Leave with /escort quit, same as an escort. Permission: havocsus.patrol
+  # Reasons are read live from DonutPunishments' own plugins/DonutPunishments/
+  # messages.yml (the `reasons:` block), so whatever you configure there shows
+  # up here - no duplicate list to keep in sync.
   enabled: true
+  # The command each button runs. Dispatched AS the staff member, so their
+  # permissions apply and the punishment is attributed to them.
+  command: "punish %player% %reason%"
+  # Only used if DonutPunishments isn't installed or its messages.yml is
+  # unreadable. Format: key|type|duration
+  fallback-reasons:
+    - "hacked client|ban|30d"
+    - "movement mods|ban|14d"
+    - "inventory mods|ban|7d"
+    - "health indicators|ban|7d"
+    - "radar/esp|ban|14d"
+    - "xray|ban|30d"
+    - "freecam|ban|14d"
+    - "macros|ban|14d"
+    - "autoclicker|ban|14d"
+    - "mouse tweaks|ban|7d"
+    - "crafting mods|ban|7d"
+    - "baritone|ban|14d"
+    - "bug abuse|ban|30d"
+    - "duping|ban|"
+    - "lag machine|ban|30d"
+    - "server crashing|ban|"
+    - "seed abuse|ban|30d"
+    - "irl trading|ban|"
+    - "cross server trading|ban|30d"
+    - "external gambling|ban|30d"
+    - "invite rewards|ban|14d"
+    - "nitro rewards|ban|14d"
+    - "alt abuse|ban|30d"
+    - "account sharing|ban|14d"
+    - "staff impersonation|ban|30d"
+    - "scamming|ban|14d"
+    - "chargeback|ban|"
+    - "spawn griefing|ban|14d"
+    - "farm griefing|ban|7d"
+    - "spawn trapping|ban|7d"
+    - "combat logging|ban|1d"
+    - "inappropriate builds|ban|14d"
+    - "inappropriate skin/name|ban|7d"
+    - "afk machine|ban|3d"
+    - "bot accounts|ban|30d"
+    - "ban evasion|ban|"
+    - "mute evasion|ban|7d"
+    - "lying to staff|ban|7d"
+    - "failure to report|kick|"
+    - "spam|mute|1h"
+    - "caps spam|mute|30m"
+    - "chat flooding|mute|1h"
+    - "filter bypass|mute|3h"
+    - "excessive swearing|mute|1h"
+    - "harassment|mute|1d"
+    - "toxicity|mute|6h"
+    - "advertising|mute|1d"
+    - "malicious links|ban|30d"
+    - "hate speech|mute|7d"
+    - "slurs|mute|7d"
+    - "death threats|ban|30d"
+    - "ddos threats|ban|"
+    - "doxxing|ban|"
+    - "player impersonation|mute|1d"
+    - "nsfw|ban|14d"
+    - "political/religious|mute|3h"
+    - "staff disrespect|mute|6h"
+    - "begging|mute|30m"
+    - "voice chat abuse|mute|1d"
+    - "encouraging rule breaking|mute|1d"
 
 double-sneak:
   enabled: true
@@ -115,14 +179,24 @@ restrictions:
   # (Bypass permission: havocsus.bypass.commands)
   #
   #   havocsus / escort / hs are listed so staff can always run
-  #   `/escort quit` and get out. Delete them if you want them gone too -
+  #   `/hs quit` and get out. Delete them if you want them gone too -
   #   just know that leaves double-shift and disconnecting as the only exits.
   allowed-commands:
     - punish
+    - offend
+    - ban
+    - unban
+    - kick
+    - mute
+    - unmute
+    - checkban
+    - checkmute
+    - banhistory
+    - mutehistory
+    - alts
     - sus
     - suspicious
     - havocsus
-    - escort
     - hs
 
 sounds:
@@ -135,7 +209,7 @@ sounds:
 messages:
   prefix: "<gradient:#5b8cff:#a45bff><bold>Escort</bold></gradient> <dark_gray>»</dark_gray> "
   engaged: "<gray>Escorting <white><target></white>. You are <aqua>vanished</aqua> and locked within <yellow><radius></yellow> blocks."
-  engaged-hint: "<dark_gray>Double-shift to drop into <white><mode></white> · <white>/escort quit</white> to leave.</dark_gray>"
+  engaged-hint: "<dark_gray>Double-shift to drop into <white><mode></white> · <white>/hs quit</white> to leave.</dark_gray>"
   retargeted: "<gray>Now escorting <white><target></white>.</gray>"
   released: "<gray>Escort ended. <dark_gray>(<reason>)</dark_gray>"
   target-left: "<red><target></red> left the server."
@@ -146,7 +220,7 @@ messages:
   spectate-blocked: "<red>You may only spectate <white><target></white> during an escort.</red>"
   teleport-blocked: "<red>That teleport would break the escort leash.</red>"
   command-blocked: "<red>/<command> is blocked during an escort.</red> <gray>Only <white>/punish</white> and <white>/sus</white> are allowed.</gray>"
-  vanish-locked: "<red>You can't un-vanish during an escort.</red> <gray>Use <white>/escort quit</white> first.</gray>"
+  vanish-locked: "<red>You can't un-vanish during an escort.</red> <gray>Use <white>/hs quit</white> first.</gray>"
   build-blocked: "<red>You can't break or place blocks during an escort.</red>"
   interaction-blocked: "<red>You can't touch the world while escorting.</red>"
   gamemode-locked: "<red>Gamemode is locked during an escort.</red> <gray>Double-shift instead.</gray>"
@@ -154,14 +228,12 @@ messages:
   list-header: "<gray>Click a name to teleport and watch them:</gray>"
   list-empty: "<gray>Nobody else is online.</gray>"
   player-not-found: "<red><name> isn't online.</red>"
-  patrol-started: "<gray>Free spectate. <aqua>Vanished</aqua>, no leash - watch anyone you like."
-  patrol-hint: "<dark_gray>Double-shift for <white><mode></white> · <white>/escort quit</white> to leave. Building and commands stay locked.</dark_gray>"
-  patrol-disabled: "<red>Free spectate is disabled on this server.</red>"
-  already-in-session: "<red>You're already in a session.</red> <gray>Use <white>/escort quit</white> first.</gray>"
-  action-bar-patrol: "<gray>Patrol <dark_gray>|</dark_gray> <mode>"
+  punish-header: "<gray>Punishment options for <white><target></white>:</gray>"
+  punish-empty: "<red>No punishment reasons are configured.</red>"
+  already-in-session: "<red>You're already in a session.</red> <gray>Use <white>/hs quit</white> first.</gray>"
   action-bar: "<gray><target> <dark_gray>|</dark_gray> <distance>/<radius>m <dark_gray>|</dark_gray> <mode>"
   action-bar-warn: "<red><target> <dark_gray>|</dark_gray> <distance>/<radius>m <dark_gray>|</dark_gray> <mode>"
   reloaded: "<green>Config reloaded.</green>"
   radius-set: "<green>Leash radius set to <yellow><radius></yellow> blocks.</green>"
   no-permission: "<red>No permission.</red>"
-  usage: "<gray>/escort <white>spec</white> · <white>quit</white> · <white>status</white> · <white>radius <n></white> · <white>reload</white></gray>"
+  usage: "<gray>/hs <white>quit</white> · <white>status</white> · <white>radius <n></white> · <white>reload</white></gray>"

@@ -1,6 +1,7 @@
 package com.havocsus.dialog;
 
 import com.havocsus.HavocSusPlugin;
+import com.havocsus.hook.PunishHook;
 import io.papermc.paper.dialog.Dialog;
 import io.papermc.paper.registry.data.dialog.ActionButton;
 import io.papermc.paper.registry.data.dialog.DialogBase;
@@ -17,6 +18,9 @@ import org.bukkit.entity.Player;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.List;
 
 /**
@@ -32,9 +36,13 @@ public final class WatchDialog {
     private static final TextColor MUTED = TextColor.color(0x6C7A93);
     private static final TextColor DANGER = TextColor.color(0xFF8B8E);
     private static final TextColor GOOD = TextColor.color(0xAEFFC1);
+    private static final TextColor WARN = TextColor.color(0xFFD479);
 
     /** Buttons past this point make the screen unusable, so we cut it off. */
     private static final int MAX_BUTTONS = 40;
+
+    /** Reasons per page in a punishment category. */
+    private static final int PAGE_SIZE = 20;
 
     private final HavocSusPlugin plugin;
 
@@ -91,7 +99,6 @@ public final class WatchDialog {
         for (Player target : candidates) {
             buttons.add(watchButton(staff, target));
         }
-        buttons.add(patrolButton(staff));
 
         // Single column reads better for a short list; two once it gets long.
         int columns = buttons.size() <= 6 ? 1 : 2;
@@ -136,18 +143,195 @@ public final class WatchDialog {
                         clickOptions()));
     }
 
-    private ActionButton patrolButton(Player staff) {
+    /**
+     * The punish screen: shown when staff run /sus again while already watching
+     * someone.
+     *
+     * A real reason list runs to dozens of entries (the shipped DonutPunishments
+     * config has 60), and dumping all of them into one multi-action dialog gives
+     * you an unusable wall of buttons. So this is a category screen - bans,
+     * mutes, kicks - and each category is paged.
+     */
+    public void openPunish(Player staff, Player target) {
+        List<PunishHook.Reason> reasons = plugin.punishments().reasons();
+
+        // Grouped by type, preserving the order they appear in the file so
+        // related reasons stay together instead of being alphabetised apart.
+        Map<String, List<PunishHook.Reason>> byType = new LinkedHashMap<>();
+        for (PunishHook.Reason reason : reasons) {
+            byType.computeIfAbsent(reason.type().toLowerCase(Locale.ROOT),
+                    k -> new ArrayList<>()).add(reason);
+        }
+
+        List<DialogBody> body = new ArrayList<>();
+        body.add(DialogBody.plainMessage(Component.text()
+                .append(Component.text("Punishing ", MUTED))
+                .append(Component.text(target.getName(), NamedTextColor.WHITE))
+                .build()));
+        if (reasons.isEmpty()) {
+            body.add(DialogBody.plainMessage(Component.text(
+                    "No punishment reasons are configured.", DANGER)));
+        } else {
+            body.add(DialogBody.plainMessage(Component.text(
+                    reasons.size() + " reasons · duration scales with prior offences", MUTED)));
+        }
+
+        List<ActionButton> buttons = new ArrayList<>();
+        for (Map.Entry<String, List<PunishHook.Reason>> entry : byType.entrySet()) {
+            String type = entry.getKey();
+            int count = entry.getValue().size();
+            buttons.add(ActionButton.create(
+                    Component.text(prettify(type) + "  (" + count + ")", colourFor(type)),
+                    Component.text("Browse the " + count + " " + type + " reasons", MUTED),
+                    150,
+                    DialogAction.customClick(
+                            (view, audience) -> runSync(() ->
+                                    openPunishCategory(staff, target, type, 0)),
+                            clickOptions())));
+        }
+        buttons.add(stopWatchingButton(staff));
+
+        showScreen(staff,
+                Component.text("Punish " + target.getName(), DANGER, TextDecoration.BOLD),
+                body, buttons, ActionButton.create(Component.text("Close", MUTED), null, 100, null));
+    }
+
+    /** One page of reasons for a single punishment type. */
+    public void openPunishCategory(Player staff, Player target, String type, int page) {
+        List<PunishHook.Reason> all = new ArrayList<>();
+        for (PunishHook.Reason reason : plugin.punishments().reasons()) {
+            if (reason.type().equalsIgnoreCase(type)) {
+                all.add(reason);
+            }
+        }
+        if (all.isEmpty()) {
+            openPunish(staff, target);
+            return;
+        }
+
+        int pages = (all.size() + PAGE_SIZE - 1) / PAGE_SIZE;
+        int current = Math.max(0, Math.min(page, pages - 1));
+        int from = current * PAGE_SIZE;
+        int to = Math.min(from + PAGE_SIZE, all.size());
+
+        List<ActionButton> buttons = new ArrayList<>();
+        for (PunishHook.Reason reason : all.subList(from, to)) {
+            buttons.add(punishButton(staff, target, reason));
+        }
+
+        if (current > 0) {
+            final int previous = current - 1;
+            buttons.add(ActionButton.create(
+                    Component.text("« Previous page", MUTED), null, 150,
+                    DialogAction.customClick(
+                            (view, audience) -> runSync(() ->
+                                    openPunishCategory(staff, target, type, previous)),
+                            clickOptions())));
+        }
+        if (current < pages - 1) {
+            final int next = current + 1;
+            buttons.add(ActionButton.create(
+                    Component.text("Next page »", MUTED), null, 150,
+                    DialogAction.customClick(
+                            (view, audience) -> runSync(() ->
+                                    openPunishCategory(staff, target, type, next)),
+                            clickOptions())));
+        }
+        buttons.add(ActionButton.create(
+                Component.text("Back", ACCENT), null, 150,
+                DialogAction.customClick(
+                        (view, audience) -> runSync(() -> openPunish(staff, target)),
+                        clickOptions())));
+
+        List<DialogBody> body = new ArrayList<>();
+        body.add(DialogBody.plainMessage(Component.text()
+                .append(Component.text(target.getName(), NamedTextColor.WHITE))
+                .append(Component.text("  ·  page " + (current + 1) + " of " + pages, MUTED))
+                .build()));
+
+        showScreen(staff,
+                Component.text(prettify(type) + " reasons", colourFor(type), TextDecoration.BOLD),
+                body, buttons, ActionButton.create(Component.text("Close", MUTED), null, 100, null));
+    }
+
+    private ActionButton stopWatchingButton(Player staff) {
         return ActionButton.create(
-                Component.text("Free spectate", DANGER),
-                Component.text("Vanished spectator, no leash, watch anyone", MUTED),
+                Component.text("Stop watching", GOOD),
+                Component.text("End the session and go back where you were", MUTED),
                 150,
                 DialogAction.customClick(
                         (view, audience) -> runSync(() -> {
-                            if (!plugin.escorts().isEscorting(staff)) {
-                                plugin.escorts().beginPatrol(staff);
+                            if (plugin.escorts().isEscorting(staff)) {
+                                plugin.escorts().release(staff, "left via dialog");
                             }
                         }),
                         clickOptions()));
+    }
+
+    /** Shared plumbing so every screen is built the same way. */
+    private void showScreen(Player staff, Component title, List<DialogBody> body,
+                            List<ActionButton> buttons, ActionButton exitButton) {
+        int columns = buttons.size() <= 6 ? 1 : 2;
+        final List<DialogBody> finalBody = List.copyOf(body);
+        final List<ActionButton> finalButtons = List.copyOf(buttons);
+
+        Dialog dialog = Dialog.create(builder -> builder.empty()
+                .base(DialogBase.builder(title)
+                        .canCloseWithEscape(true)
+                        .body(finalBody)
+                        .build())
+                .type(DialogType.multiAction(finalButtons, exitButton, columns)));
+
+        staff.showDialog(dialog);
+    }
+
+    private static TextColor colourFor(String type) {
+        if ("ban".equalsIgnoreCase(type)) {
+            return DANGER;
+        }
+        if ("mute".equalsIgnoreCase(type)) {
+            return WARN;
+        }
+        return ACCENT;
+    }
+
+    private ActionButton punishButton(Player staff, Player target, PunishHook.Reason reason) {
+        TextColor colour = colourFor(reason.type());
+        String durationLabel = reason.durationLabel();
+
+        Component tooltip = Component.text()
+                .append(Component.text(reason.type().toUpperCase(Locale.ROOT), colour))
+                .append(durationLabel.isEmpty()
+                        ? Component.empty()
+                        : Component.text(" · " + durationLabel, MUTED))
+                .append(reason.message().isBlank()
+                        ? Component.empty()
+                        : Component.newline().append(Component.text(reason.message(), MUTED)))
+                .build();
+
+        String command = plugin.punishments().buildCommand(target.getName(), reason);
+
+        return ActionButton.create(
+                Component.text(prettify(reason.key()), colour),
+                tooltip,
+                150,
+                DialogAction.customClick(
+                        (view, audience) -> runSync(() -> {
+                            if (staff.isOnline()) {
+                                // Dispatched as the staff member so their
+                                // permissions apply and the punishment is
+                                // attributed to them, not to console.
+                                plugin.getServer().dispatchCommand(staff, command);
+                            }
+                        }),
+                        clickOptions()));
+    }
+
+    private static String prettify(String key) {
+        if (key == null || key.isEmpty()) {
+            return "";
+        }
+        return Character.toUpperCase(key.charAt(0)) + key.substring(1);
     }
 
     private ClickCallback.Options clickOptions() {

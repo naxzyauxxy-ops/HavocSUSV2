@@ -13,8 +13,7 @@ Staff clicks a cheater in the SUS GUI → SUS teleports them → HavocSus takes 
 | **No building** | Break and place are refused for the entire session, in both modes |
 | **Command whitelist** | Only `/punish` and `/sus` go through — everything else is refused |
 | **Vanish locked on** | Can't un-vanish mid-escort by command, toggle item, or API |
-| **Free spectate** | `/escort spec` — vanished spectator, no leash, watch anyone |
-| **Exit** | `/escort quit` — original gamemode, flight state, position and vanish state all restored |
+| **Exit** | `/hs quit` — original gamemode, flight state, position and vanish state all restored |
 
 ## Why it's built this way
 
@@ -29,7 +28,7 @@ Verified against **SUS 1.0.7** (and 1.0.5). The holder package, the `target_uuid
 
 The one behavioural change in 1.0.7: the GUI click is now split — **left-click teleports, right-click dismisses the flag** without moving you. `engage.ignore-right-click` (default `true`) makes the bridge skip right-clicks so dismissing a flag doesn't arm an escort. Set it to `false` if you ever run 1.0.5 or older, where every click teleported.
 
-That means this jar compiles and builds in CI with only `paper-api` — no paid jars in your repo — and degrades gracefully: no PremiumVanish means escorts run unvanished, no SUS means you start them with `/escort <player>`.
+That means this jar compiles and builds in CI with only `paper-api` — no paid jars in your repo — and degrades gracefully: no PremiumVanish means escorts run unvanished, no SUS means you start them with `/hs <player>`.
 
 ## Build
 
@@ -44,20 +43,19 @@ Requires JDK 21. CI is in `.github/workflows/build.yml` — it builds on every p
 
 1. Drop `HavocSus-1.0.0.jar` into `plugins/` alongside SUS and PremiumVanish.
 2. Start once to generate `plugins/HavocSus/config.yml`.
-3. Tune `leash.radius` (default 150) and `double-sneak.survival-gamemode`, then `/escort reload`.
+3. Tune `leash.radius` (default 150) and `double-sneak.survival-gamemode`, then `/hs reload`.
 
 ## Commands
 
 | Command | Permission | |
 |---|---|---|
-| `/escort spec [player]` | `havocsus.patrol` | Free vanished spectate, no leash |
-| `/escort quit` | `havocsus.use` | End your session |
-| `/escort status` | `havocsus.use` | Current target, distance, mode |
-| `/escort <player>` | `havocsus.use` | Start an escort manually |
-| `/escort radius <n>` | `havocsus.admin` | Change and save the leash radius |
-| `/escort reload` | `havocsus.admin` | Reload config |
+| `/hs quit` | `havocsus.use` | End your session |
+| `/hs status` | `havocsus.use` | Current target, distance, mode |
+| `/hs <player>` | `havocsus.use` | Start an escort manually |
+| `/hs radius <n>` | `havocsus.admin` | Change and save the leash radius |
+| `/hs reload` | `havocsus.admin` | Reload config |
 
-Aliases: `/havocsus`, `/hs`.
+Aliases: `/havocsus`, `/hs`. There is no `/escort` — it was removed.
 
 ## Permissions
 
@@ -81,7 +79,19 @@ Either way the command exists. Disable with `sus-command.register-if-absent: fal
 |---|---|
 | `/sus` | Opens the watch list |
 | `/sus <player>` | Teleports straight to them and starts watching |
-| `/escort list` | Same watch list, whoever owns `/sus` |
+| `/hs list` | Same watch list, whoever owns `/sus` |
+
+## Punishments
+
+Running `/sus` again while you're already watching someone opens the **punish screen** for them rather than reopening the list. Reasons are read live from DonutPunishments' own `plugins/DonutPunishments/messages.yml` (`reasons:` block), so whatever the server has configured is what appears — there's no second list to keep in sync.
+
+A real reason list is long (the configured set here is 60), and 60 buttons in one dialog is a wall you can't use. So the screen is **grouped by type** — Bans, Mutes, Kicks, with counts — and each category is **paged at 20 per screen** with Previous/Next. Bans are red, mutes amber, kicks blue, with type and duration in the tooltip. Reasons keep their file order so related ones stay together rather than being alphabetised apart.
+
+Each button dispatches `/punish <player> <reason>` **as the staff member**, so their permissions apply and the punishment is attributed to them rather than to console. Template is `punish.command` if you use a different punishment plugin.
+
+There's a "Stop watching" button on that screen too, since `/escort quit` no longer exists.
+
+If DonutPunishments is missing or its file is unreadable, `punish.fallback-reasons` in HavocSus's config is used instead.
 
 ## The watch list dialog
 
@@ -105,14 +115,6 @@ Everything else falls through untouched:
 | `/sus reload`, `/sus clear` | SUS admin commands |
 | `/sus <offline or misspelled name>` | SUS's history GUI, so lookups still work |
 
-## Two session types
-
-**Escort** (SUS-driven) is leashed to one suspect and spectate-locked to them. That lock is what stops the bubble becoming a free map tour, so it stays.
-
-**Patrol** (`/escort spec`) is the free version: vanished spectator, no leash, no target lock, so you can watch anyone on the server whether or not they're flagged. What it *keeps* is the lockdown — no breaking, no placing, no looting, and the same command whitelist. It's the safe replacement for dropping into spectator by hand.
-
-Both leave the same way, with `/escort quit`, and both restore your gamemode, flight state, position and vanish state.
-
 ## Restrictions while escorting
 
 **Commands are a whitelist, not a blacklist.** `restrictions.allowed-commands` in the config lists what gets through; everything else is refused, including namespaced forms like `/essentials:tp` (the namespace is stripped before the check, so that dodge doesn't work). Default list:
@@ -123,7 +125,7 @@ allowed-commands:
   - sus
   - suspicious
   - havocsus   # \
-  - escort     #  |- so /escort quit still works
+  - escort     #  |- so /hs quit still works
   - hs         # /
 ```
 

@@ -31,7 +31,7 @@ public final class Settings {
     static {
         DEFAULT_MESSAGES.put("prefix", "<gradient:#5b8cff:#a45bff><bold>Escort</bold></gradient> <dark_gray>»</dark_gray> ");
         DEFAULT_MESSAGES.put("engaged", "<gray>Escorting <white><target></white>. You are <aqua>vanished</aqua> and locked within <yellow><radius></yellow> blocks.");
-        DEFAULT_MESSAGES.put("engaged-hint", "<dark_gray>Double-shift to drop into <white><mode></white> · <white>/escort quit</white> to leave.</dark_gray>");
+        DEFAULT_MESSAGES.put("engaged-hint", "<dark_gray>Double-shift to drop into <white><mode></white> · <white>/hs quit</white> to leave.</dark_gray>");
         DEFAULT_MESSAGES.put("retargeted", "<gray>Now escorting <white><target></white>.</gray>");
         DEFAULT_MESSAGES.put("released", "<gray>Escort ended. <dark_gray>(<reason>)</dark_gray>");
         DEFAULT_MESSAGES.put("target-left", "<red><target></red> left the server.");
@@ -42,7 +42,7 @@ public final class Settings {
         DEFAULT_MESSAGES.put("spectate-blocked", "<red>You may only spectate <white><target></white> during an escort.</red>");
         DEFAULT_MESSAGES.put("teleport-blocked", "<red>That teleport would break the escort leash.</red>");
         DEFAULT_MESSAGES.put("command-blocked", "<red>/<command> is blocked during an escort.</red> <gray>Only <white>/punish</white> and <white>/sus</white> are allowed.</gray>");
-        DEFAULT_MESSAGES.put("vanish-locked", "<red>You can't un-vanish during an escort.</red> <gray>Use <white>/escort quit</white> first.</gray>");
+        DEFAULT_MESSAGES.put("vanish-locked", "<red>You can't un-vanish during an escort.</red> <gray>Use <white>/hs quit</white> first.</gray>");
         DEFAULT_MESSAGES.put("build-blocked", "<red>You can't break or place blocks during an escort.</red>");
         DEFAULT_MESSAGES.put("interaction-blocked", "<red>You can't touch the world while escorting.</red>");
         DEFAULT_MESSAGES.put("gamemode-locked", "<red>Gamemode is locked during an escort.</red> <gray>Double-shift instead.</gray>");
@@ -50,17 +50,15 @@ public final class Settings {
         DEFAULT_MESSAGES.put("list-header", "<gray>Click a name to teleport and watch them:</gray>");
         DEFAULT_MESSAGES.put("list-empty", "<gray>Nobody else is online.</gray>");
         DEFAULT_MESSAGES.put("player-not-found", "<red><name> isn't online.</red>");
-        DEFAULT_MESSAGES.put("patrol-started", "<gray>Free spectate. <aqua>Vanished</aqua>, no leash - watch anyone you like.");
-        DEFAULT_MESSAGES.put("patrol-hint", "<dark_gray>Double-shift for <white><mode></white> · <white>/escort quit</white> to leave. Building and commands stay locked.</dark_gray>");
-        DEFAULT_MESSAGES.put("patrol-disabled", "<red>Free spectate is disabled on this server.</red>");
-        DEFAULT_MESSAGES.put("already-in-session", "<red>You're already in a session.</red> <gray>Use <white>/escort quit</white> first.</gray>");
-        DEFAULT_MESSAGES.put("action-bar-patrol", "<gray>Patrol <dark_gray>|</dark_gray> <mode>");
+        DEFAULT_MESSAGES.put("punish-header", "<gray>Punishment options for <white><target></white>:</gray>");
+        DEFAULT_MESSAGES.put("punish-empty", "<red>No punishment reasons are configured.</red>");
+        DEFAULT_MESSAGES.put("already-in-session", "<red>You're already in a session.</red> <gray>Use <white>/hs quit</white> first.</gray>");
         DEFAULT_MESSAGES.put("action-bar", "<gray><target> <dark_gray>|</dark_gray> <distance>/<radius>m <dark_gray>|</dark_gray> <mode>");
         DEFAULT_MESSAGES.put("action-bar-warn", "<red><target> <dark_gray>|</dark_gray> <distance>/<radius>m <dark_gray>|</dark_gray> <mode>");
         DEFAULT_MESSAGES.put("reloaded", "<green>Config reloaded.</green>");
         DEFAULT_MESSAGES.put("radius-set", "<green>Leash radius set to <yellow><radius></yellow> blocks.</green>");
         DEFAULT_MESSAGES.put("no-permission", "<red>No permission.</red>");
-        DEFAULT_MESSAGES.put("usage", "<gray>/escort <white>spec</white> · <white>quit</white> · <white>status</white> · <white>radius <n></white> · <white>reload</white></gray>");
+        DEFAULT_MESSAGES.put("usage", "<gray>/hs <white>quit</white> · <white>status</white> · <white>radius <n></white> · <white>reload</white></gray>");
     }
 
     private final HavocSusPlugin plugin;
@@ -75,8 +73,7 @@ public final class Settings {
     public Set<String> susPassthroughArgs = new HashSet<>();
     public boolean ignoreRightClick = true;
 
-    // patrol (free spectate)
-    public boolean patrolEnabled = true;
+    public boolean punishEnabled = true;
 
     // leash
     public double radius = 150.0D;
@@ -134,7 +131,7 @@ public final class Settings {
             }
         }
         ignoreRightClick = c.getBoolean("engage.ignore-right-click", true);
-        patrolEnabled = c.getBoolean("patrol.enabled", true);
+        punishEnabled = c.getBoolean("punish.enabled", true);
 
         radius = Math.max(8.0D, c.getDouble("leash.radius", 150.0D));
         warnAt = Math.min(radius - 1.0D, c.getDouble("leash.warn-at", radius - 10.0D));

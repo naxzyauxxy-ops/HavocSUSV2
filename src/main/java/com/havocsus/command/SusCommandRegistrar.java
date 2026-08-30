@@ -89,6 +89,16 @@ public final class SusCommandRegistrar {
             return true;
         }
 
+        if (args.length >= 1 && (args[0].equalsIgnoreCase("quit")
+                || args[0].equalsIgnoreCase("exit"))) {
+            if (!plugin.escorts().isEscorting(staff)) {
+                staff.sendMessage(plugin.settings().msg("not-escorting"));
+                return true;
+            }
+            plugin.escorts().release(staff, "left manually");
+            return true;
+        }
+
         if (args.length >= 1) {
             Player target = plugin.getServer().getPlayerExact(args[0]);
             if (target == null) {
@@ -103,7 +113,7 @@ public final class SusCommandRegistrar {
             return true;
         }
 
-        plugin.openWatchList(staff);
+        plugin.openSusScreen(staff);
         return true;
     }
 
@@ -113,6 +123,9 @@ public final class SusCommandRegistrar {
         }
         String prefix = args[0].toLowerCase(Locale.ROOT);
         List<String> names = new ArrayList<>();
+        if ("quit".startsWith(prefix)) {
+            names.add("quit");
+        }
         for (Player online : plugin.getServer().getOnlinePlayers()) {
             if (online.getName().toLowerCase(Locale.ROOT).startsWith(prefix)) {
                 names.add(online.getName());

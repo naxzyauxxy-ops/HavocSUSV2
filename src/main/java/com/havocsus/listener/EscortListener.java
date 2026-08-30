@@ -47,8 +47,8 @@ public final class EscortListener implements Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
         EscortSession session = plugin.escorts().session(event.getPlayer());
-        if (session == null || session.isPatrol()) {
-            return; // patrol is deliberately unleashed
+        if (session == null) {
+            return;
         }
         Player staff = event.getPlayer();
         if (staff.hasPermission("havocsus.bypass.leash")) {
@@ -109,8 +109,8 @@ public final class EscortListener implements Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onTeleport(PlayerTeleportEvent event) {
         EscortSession session = plugin.escorts().session(event.getPlayer());
-        if (session == null || session.isInternalAction() || session.isPatrol()) {
-            return; // patrol may teleport freely
+        if (session == null || session.isInternalAction()) {
+            return;
         }
         Settings s = plugin.settings();
         if (!s.blockExternalTeleports) {
@@ -151,10 +151,6 @@ public final class EscortListener implements Listener {
     public void onSpectate(PlayerStartSpectatingEntityEvent event) {
         EscortSession session = plugin.escorts().session(event.getPlayer());
         if (session == null || !plugin.settings().blockSpectateOthers) {
-            return;
-        }
-        // Patrol exists precisely so staff can watch players who aren't flagged.
-        if (session.isPatrol()) {
             return;
         }
         Entity newTarget = event.getNewSpectatorTarget();

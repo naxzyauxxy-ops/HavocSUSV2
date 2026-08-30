@@ -134,19 +134,6 @@ public final class EscortManager {
 
         EscortSession existing = sessions.get(staff.getUniqueId());
         if (existing != null) {
-            if (existing.isPatrol()) {
-                // Clicking a flagged player from free spectate promotes the
-                // session to a real, leashed escort - otherwise you'd get the
-                // teleport with none of the escort behaviour.
-                EscortSession promoted = existing.convertToEscort(target.getUniqueId());
-                sessions.put(staff.getUniqueId(), promoted);
-                applyMode(staff, promoted, promoted.mode(), false);
-                staff.sendMessage(s.msg("engaged",
-                        "<target>", target.getName(),
-                        "<radius>", trim(s.radius)));
-                play(staff, s.engageSound);
-                return;
-            }
             // Switching suspects mid-session keeps the ORIGINAL return point,
             // otherwise each hop would overwrite it with the last suspect's spot.
             existing.retarget(target.getUniqueId());
@@ -155,8 +142,8 @@ public final class EscortManager {
             return;
         }
 
-        EscortSession session = new EscortSession(staff, EscortSession.Type.ESCORT,
-                target.getUniqueId(), origin, plugin.vanish().isVanished(staff));
+        EscortSession session = new EscortSession(staff, target.getUniqueId(), origin,
+                plugin.vanish().isVanished(staff));
         sessions.put(staff.getUniqueId(), session);
 
         if (s.autoVanish && !session.wasAlreadyVanished()) {
@@ -174,39 +161,6 @@ public final class EscortManager {
     }
 
     /** Double-shift handler: spectator <-> solid. */
-    /**
-     * Free-roam vanished spectator, not tied to any SUS flag.
-     *
-     * No leash and no spectate lock, so staff can watch anyone on the server.
-     * The build block, command whitelist and vanish lock still apply, which is
-     * the whole point - it's the safe version of dropping into spectator by
-     * hand, not an unrestricted one.
-     */
-    public boolean beginPatrol(Player staff) {
-        if (staff == null) {
-            return false;
-        }
-        if (sessions.containsKey(staff.getUniqueId())) {
-            return false;
-        }
-        Settings s = plugin.settings();
-
-        EscortSession session = new EscortSession(staff, EscortSession.Type.PATROL,
-                null, staff.getLocation(), plugin.vanish().isVanished(staff));
-        sessions.put(staff.getUniqueId(), session);
-
-        if (s.autoVanish && !session.wasAlreadyVanished()) {
-            plugin.vanish().hide(staff);
-        }
-        applyMode(staff, session, EscortSession.Mode.SPECTATOR, false);
-
-        staff.sendMessage(s.msg("patrol-started"));
-        staff.sendMessage(s.msg("patrol-hint",
-                "<mode>", s.activeGameMode.name().toLowerCase()));
-        play(staff, s.engageSound);
-        return true;
-    }
-
     public void toggleMode(Player staff, EscortSession session) {
         EscortSession.Mode next = session.mode() == EscortSession.Mode.SPECTATOR
                 ? EscortSession.Mode.ACTIVE
@@ -332,16 +286,6 @@ public final class EscortManager {
             Player staff = session.staff();
             if (staff == null || !staff.isOnline()) {
                 sessions.remove(staffId);
-                continue;
-            }
-
-            // Patrol has no suspect and no leash - just keep the readout alive.
-            if (session.isPatrol()) {
-                if (s.actionBar) {
-                    staff.sendActionBar(s.bare("action-bar-patrol",
-                            "<mode>", session.mode() == EscortSession.Mode.SPECTATOR
-                                    ? "Spectator" : capitalise(s.activeGameMode.name())));
-                }
                 continue;
             }
 

@@ -75,32 +75,6 @@ public final class EscortCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (sub.equals("spec") || sub.equals("patrol") || sub.equals("spectate")) {
-            if (!staff.hasPermission("havocsus.patrol")) {
-                staff.sendMessage(plugin.settings().msg("no-permission"));
-                return true;
-            }
-            if (!plugin.settings().patrolEnabled) {
-                staff.sendMessage(plugin.settings().msg("patrol-disabled"));
-                return true;
-            }
-            if (plugin.escorts().isEscorting(staff)) {
-                staff.sendMessage(plugin.settings().msg("already-in-session"));
-                return true;
-            }
-            if (!plugin.escorts().beginPatrol(staff)) {
-                return true;
-            }
-            // Optional target: /hs spec <player> drops you next to them first.
-            if (args.length >= 2) {
-                Player watch = plugin.getServer().getPlayerExact(args[1]);
-                if (watch != null && !watch.equals(staff)) {
-                    staff.teleport(watch.getLocation());
-                }
-            }
-            return true;
-        }
-
         if (sub.equals("list") || sub.equals("dialog") || sub.equals("menu")) {
             plugin.openWatchList(staff);
             return true;
@@ -151,7 +125,7 @@ public final class EscortCommand implements CommandExecutor, TabCompleter {
         if (args.length != 1) {
             return Collections.emptyList();
         }
-        List<String> options = new ArrayList<>(List.of("quit", "status", "spec", "list"));
+        List<String> options = new ArrayList<>(List.of("quit", "status", "list"));
         if (sender.hasPermission("havocsus.admin")) {
             options.add("reload");
             options.add("radius");

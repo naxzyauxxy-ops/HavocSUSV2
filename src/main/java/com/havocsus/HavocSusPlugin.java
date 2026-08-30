@@ -4,6 +4,7 @@ import com.havocsus.command.EscortCommand;
 import com.havocsus.command.SusCommandRegistrar;
 import com.havocsus.dialog.WatchDialog;
 import com.havocsus.escort.EscortManager;
+import com.havocsus.hook.PunishHook;
 import com.havocsus.hook.SusHook;
 import com.havocsus.hook.VanishHook;
 import com.havocsus.listener.EscortListener;
@@ -27,6 +28,7 @@ public final class HavocSusPlugin extends JavaPlugin {
     private EscortManager escortManager;
     private SusCommandRegistrar susCommandRegistrar;
     private WatchDialog watchDialog;
+    private PunishHook punishHook;
 
     @Override
     public void onEnable() {
@@ -37,6 +39,7 @@ public final class HavocSusPlugin extends JavaPlugin {
 
         this.vanishHook = new VanishHook(this);
         this.susHook = new SusHook(this);
+        this.punishHook = new PunishHook(this);
         this.escortManager = new EscortManager(this);
 
         getServer().getPluginManager().registerEvents(new SusBridgeListener(this), this);
@@ -135,6 +138,56 @@ public final class HavocSusPlugin extends JavaPlugin {
         escortManager.engage(staff, target, origin);
     }
 
+    /**
+     * What /sus does with no arguments.
+     *
+     * Already watching someone -> punish screen for them. Otherwise the watch
+     * list. This is what makes a second /sus escalate rather than reopen a menu
+     * you're already past.
+     */
+    public void openSusScreen(Player staff) {
+        EscortSession session = escortManager.session(staff);
+        if (session != null && settings.punishEnabled && staff.hasPermission("havocsus.punish")) {
+            Player target = session.target();
+            if (target != null && target.isOnline()) {
+                openPunishList(staff, target);
+                return;
+            }
+        }
+        openWatchList(staff);
+    }
+
+    /** Punishment options for the player being watched. */
+    public void openPunishList(Player staff, Player target) {
+        if (watchDialog != null) {
+            try {
+                watchDialog.openPunish(staff, target);
+                return;
+            } catch (Throwable t) {
+                getLogger().warning("Punish dialog failed to open, falling back to chat: " + t);
+            }
+        }
+        sendChatPunishList(staff, target);
+    }
+
+    private void sendChatPunishList(Player staff, Player target) {
+        staff.sendMessage(settings().msg("punish-header", "<target>", target.getName()));
+        int shown = 0;
+        for (PunishHook.Reason reason : punishHook.reasons()) {
+            String command = punishHook.buildCommand(target.getName(), reason);
+            staff.sendMessage(MiniMessage.miniMessage().deserialize(
+                    "<gray> » <click:run_command:'/" + command + "'>"
+                            + "<hover:show_text:'<red>Click to apply'>"
+                            + "<white><reason></white></hover></click> <dark_gray><type></dark_gray>",
+                    Placeholder.unparsed("reason", reason.key()),
+                    Placeholder.unparsed("type", reason.type())));
+            shown++;
+        }
+        if (shown == 0) {
+            staff.sendMessage(settings().msg("punish-empty"));
+        }
+    }
+
     /** Opens the watch list - a dialog where supported, chat otherwise. */
     public void openWatchList(Player staff) {
         if (watchDialog != null) {
@@ -183,6 +236,10 @@ public final class HavocSusPlugin extends JavaPlugin {
 
     public VanishHook vanish() {
         return vanishHook;
+    }
+
+    public PunishHook punishments() {
+        return punishHook;
     }
 
     public SusHook sus() {

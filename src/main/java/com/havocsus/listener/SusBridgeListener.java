@@ -95,15 +95,24 @@ public final class SusBridgeListener implements Listener {
         }
 
         String[] parts = event.getMessage().substring(1).trim().split("\\s+");
-        if (parts.length < 2) {
-            return; // bare /sus - let the GUI open
-        }
         String root = parts[0].toLowerCase(Locale.ROOT);
         int colon = root.indexOf(':');
         if (colon >= 0 && colon + 1 < root.length()) {
             root = root.substring(colon + 1);
         }
         if (!root.equals("sus") && !root.equals("suspicious")) {
+            return;
+        }
+
+        // Bare /sus while already watching someone escalates to the punish
+        // screen instead of reopening SUS's list.
+        if (parts.length < 2) {
+            EscortSession active = plugin.escorts().session(staff);
+            if (active != null && active.target() != null && active.target().isOnline()
+                    && staff.hasPermission("havocsus.punish")) {
+                event.setCancelled(true);
+                plugin.openPunishList(staff, active.target());
+            }
             return;
         }
 
