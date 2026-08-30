@@ -75,7 +75,12 @@ public final class EscortCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (sub.equals("list") || sub.equals("dialog") || sub.equals("menu")) {
+        if (sub.equals("menu") || sub.equals("dialog")) {
+            plugin.openMenu(staff);
+            return true;
+        }
+
+        if (sub.equals("list")) {
             plugin.openWatchList(staff);
             return true;
         }
@@ -125,7 +130,7 @@ public final class EscortCommand implements CommandExecutor, TabCompleter {
         if (args.length != 1) {
             return Collections.emptyList();
         }
-        List<String> options = new ArrayList<>(List.of("quit", "status", "list"));
+        List<String> options = new ArrayList<>(List.of("menu", "list", "quit", "status"));
         if (sender.hasPermission("havocsus.admin")) {
             options.add("reload");
             options.add("radius");

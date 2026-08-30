@@ -4,14 +4,22 @@ main: com.havocsus.HavocSusPlugin
 api-version: '1.21'
 author: HavocSus
 description: Leashed spectator escort - staff who teleport to a flagged player via SUS get locked into a vanished spectator bubble around them.
+# Matching the exact versions DonutPunishments already declares, so these are
+# almost certainly cached in the server's libraries/ folder already and no new
+# download is needed at startup.
+libraries:
+  - org.xerial:sqlite-jdbc:3.46.0.0
+  - com.mysql:mysql-connector-j:8.4.0
+
 softdepend:
   - Sus
+  - DonutPunishments
   - PremiumVanish
 
 commands:
   havocsus:
     description: Manage escort sessions.
-    usage: /havocsus <list|quit|status|radius|reload>
+    usage: /havocsus <menu|list|quit|status|radius|reload>
     aliases:
       - hs
 

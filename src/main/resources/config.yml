@@ -34,6 +34,22 @@ leash:
   # If the flagged player changes world, drag staff along instead of ending.
   follow-world-change: true
 
+alerts:
+  # Reads alert counts and per-check breakdowns from SUS's own database
+  # (plugins/Sus/flags.db by default), read-only. SUS has no API, but its SQL
+  # column names survive obfuscation, which makes this far more durable than
+  # reflecting into its classes.
+  enabled: true
+  # How often to refresh the cache, in seconds. All queries run off the main
+  # thread; dialogs only ever read the cache.
+  refresh-seconds: 10
+  # Sort the watch list worst-offender-first instead of alphabetically.
+  sort-watch-list-by-alerts: true
+  # How many players the Top alerts board holds.
+  top-limit: 60
+  # Leave blank to auto-detect. MySQL setups usually prefix tables with sus_.
+  table-prefix: ""
+
 sus-command:
   # Makes `/sus <online player>` teleport you straight to them and start a
   # watch session, instead of opening that player's history GUI.
@@ -192,6 +208,9 @@ restrictions:
     - checkban
     - checkmute
     - banhistory
+    - banlist
+    - unpunish
+    - donutpunishments
     - mutehistory
     - alts
     - sus

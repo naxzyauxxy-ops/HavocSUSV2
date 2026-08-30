@@ -4,6 +4,8 @@ import com.havocsus.command.EscortCommand;
 import com.havocsus.command.SusCommandRegistrar;
 import com.havocsus.dialog.WatchDialog;
 import com.havocsus.escort.EscortManager;
+import com.havocsus.hook.BanListHook;
+import com.havocsus.hook.FlagStatsHook;
 import com.havocsus.hook.PunishHook;
 import com.havocsus.hook.SusHook;
 import com.havocsus.hook.VanishHook;
@@ -29,6 +31,8 @@ public final class HavocSusPlugin extends JavaPlugin {
     private SusCommandRegistrar susCommandRegistrar;
     private WatchDialog watchDialog;
     private PunishHook punishHook;
+    private FlagStatsHook flagStatsHook;
+    private BanListHook banListHook;
 
     @Override
     public void onEnable() {
@@ -40,6 +44,8 @@ public final class HavocSusPlugin extends JavaPlugin {
         this.vanishHook = new VanishHook(this);
         this.susHook = new SusHook(this);
         this.punishHook = new PunishHook(this);
+        this.flagStatsHook = new FlagStatsHook(this);
+        this.banListHook = new BanListHook(this);
         this.escortManager = new EscortManager(this);
 
         getServer().getPluginManager().registerEvents(new SusBridgeListener(this), this);
@@ -62,13 +68,15 @@ public final class HavocSusPlugin extends JavaPlugin {
                     + "the watch list will be shown in chat instead.");
         }
 
+        flagStatsHook.startRefreshTask();
         escortManager.startTasks();
 
         getLogger().info("Enabled v" + getPluginMeta().getVersion()
                 + " | SUS: " + (susHook.isAvailable() ? "hooked" : "MISSING")
                 + " | PremiumVanish: " + (vanishHook.isAvailable() ? "hooked" : "MISSING")
                 + " | /sus: " + (susCommandRegistrar.hasClaimedSus() ? "registered by us" : "intercepted")
-                + " | dialogs: " + (watchDialog != null ? "yes" : "chat fallback"));
+                + " | dialogs: " + (watchDialog != null ? "yes" : "chat fallback")
+                + " | alert stats: " + (flagStatsHook.isAvailable() ? "yes" : "no"));
     }
 
     /**
@@ -154,6 +162,19 @@ public final class HavocSusPlugin extends JavaPlugin {
                 return;
             }
         }
+        openMenu(staff);
+    }
+
+    /** The hub menu - watch list, top alerts, ban list, session actions. */
+    public void openMenu(Player staff) {
+        if (watchDialog != null) {
+            try {
+                watchDialog.openMenu(staff);
+                return;
+            } catch (Throwable t) {
+                getLogger().warning("Menu failed to open, falling back to chat: " + t);
+            }
+        }
         openWatchList(staff);
     }
 
@@ -212,11 +233,14 @@ public final class HavocSusPlugin extends JavaPlugin {
             if (online.equals(staff) || online.hasPermission("havocsus.hidefromlist")) {
                 continue;
             }
+            int alerts = flagStatsHook.alertCount(online.getUniqueId());
             staff.sendMessage(MiniMessage.miniMessage().deserialize(
-                    "<gray> » <click:run_command:'/escort " + online.getName() + "'>"
-                            + "<hover:show_text:'<green>Click to watch " + online.getName() + "'>"
-                            + "<white><name></white></hover></click> <dark_gray><world></dark_gray>",
+                    "<gray> » <click:run_command:'/hs " + online.getName() + "'>"
+                            + "<hover:show_text:'<green>Click to watch'>"
+                            + "<white><name></white></hover></click> "
+                            + "<dark_gray><alerts> alerts · <world></dark_gray>",
                     Placeholder.unparsed("name", online.getName()),
+                    Placeholder.unparsed("alerts", String.valueOf(alerts)),
                     Placeholder.unparsed("world", online.getWorld().getName())));
             shown++;
         }
@@ -236,6 +260,14 @@ public final class HavocSusPlugin extends JavaPlugin {
 
     public VanishHook vanish() {
         return vanishHook;
+    }
+
+    public BanListHook bans() {
+        return banListHook;
+    }
+
+    public FlagStatsHook flagStats() {
+        return flagStatsHook;
     }
 
     public PunishHook punishments() {

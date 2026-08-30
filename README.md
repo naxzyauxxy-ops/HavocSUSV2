@@ -93,6 +93,35 @@ There's a "Stop watching" button on that screen too, since `/escort quit` no lon
 
 If DonutPunishments is missing or its file is unreadable, `punish.fallback-reasons` in HavocSus's config is used instead.
 
+## Alert counts and checks
+
+HavocSus reads alert data straight out of SUS's own database (`plugins/Sus/flags.db`), read-only. SUS exposes no API, but its SQL schema is unobfuscated — `flags` holds one row per player (`amount`, `anti_cheat`, `last_check`, `last_violation_level`) and `flag_history` holds one row per check. Column names survive obfuscation, which makes this far more durable than reflecting into their classes.
+
+All queries run **off the main thread** on a timer into a cache; the dialogs never touch JDBC while rendering.
+
+- **Watch list** is sorted worst-offender-first, with the alert count in the button label — no hovering needed to find the problem player. Green under 15, amber under 50, red above.
+- **Tooltips** show the anti-cheat and the top four checks with hit counts and violation levels.
+- **Checks screen** gives the full per-check breakdown for whoever you're watching.
+- **Top alerts** is a leaderboard across everyone on record, online or not; online names get a button to jump straight to them.
+
+## The dialog menu
+
+`/sus` (or `/hs menu`) opens the hub, and everything hangs off it:
+
+| | |
+|---|---|
+| Watch list | Online players, worst alerts first |
+| Top alerts | Highest counts on record, including offline |
+| Ban list | Active bans, paged |
+| Punish a player | Pick anyone online — no need to watch them first |
+| Checks / Punish / Stop watching | Shown only while you're watching someone |
+
+The ban list is read reflectively from DonutPunishments' `BanCache` (unobfuscated, public fields). If that ever fails, the button falls back to running `/banlist` in chat rather than breaking.
+
+## Commands still work normally
+
+The dialogs are a convenience, not a replacement. `/punish`, `/ban`, `/kick`, `/mute`, `/banlist`, `/alts`, `/banhistory` and the rest are all on the command whitelist, so you can type them by hand at any time, including mid-session. Only vanish commands are hard-denied.
+
 ## The watch list dialog
 
 On 1.21.7+ the list is a real dialog screen (Minecraft's dialog feature, not a chest GUI): one button per online player, tooltips showing their world, plus a Free spectate button.
