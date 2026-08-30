@@ -34,6 +34,13 @@ leash:
   # If the flagged player changes world, drag staff along instead of ending.
   follow-world-change: true
 
+watch-list:
+  # OFF by default, on purpose. havocsus.hidefromlist is an opt-OUT node, so any
+  # admin with a wildcard ("*" or "havocsus.*" in LuckPerms) matches it and
+  # disappears from every list - which looks like "nobody is online" on a server
+  # full of staff. Only turn this on if you've actually set the node up.
+  respect-hide-permission: false
+
 alerts:
   # Reads alert counts and per-check breakdowns from SUS's own database
   # (plugins/Sus/flags.db by default), read-only. SUS has no API, but its SQL
@@ -247,6 +254,7 @@ messages:
   list-header: "<gray>Click a name to teleport and watch them:</gray>"
   list-empty: "<gray>Nobody else is online.</gray>"
   player-not-found: "<red><name> isn't online.</red>"
+  dialog-failed: "<red>That screen couldn't be opened.</red> <gray>Check console for details.</gray>"
   punish-header: "<gray>Punishment options for <white><target></white>:</gray>"
   punish-empty: "<red>No punishment reasons are configured.</red>"
   already-in-session: "<red>You're already in a session.</red> <gray>Use <white>/hs quit</white> first.</gray>"

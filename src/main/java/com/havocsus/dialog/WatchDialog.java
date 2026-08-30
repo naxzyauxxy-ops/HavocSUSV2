@@ -59,6 +59,20 @@ public final class WatchDialog {
         this.plugin = plugin;
     }
 
+    /**
+     * Whether a player is hidden from the lists.
+     *
+     * This is OFF by default, and deliberately so. havocsus.hidefromlist is an
+     * opt-OUT node, which means any admin holding a wildcard ("*" or
+     * "havocsus.*" in LuckPerms) matches it and vanishes from every list -
+     * which looks exactly like "nobody is online" on a server full of staff.
+     * Only servers that have actually set the node up should turn this on.
+     */
+    private boolean isHidden(Player player) {
+        return plugin.getConfig().getBoolean("watch-list.respect-hide-permission", false)
+                && player.hasPermission("havocsus.hidefromlist");
+    }
+
     public static boolean isSupported() {
         try {
             Class.forName("io.papermc.paper.dialog.Dialog");
@@ -71,7 +85,7 @@ public final class WatchDialog {
     public void open(Player staff) {
         List<Player> candidates = new ArrayList<>();
         for (Player online : plugin.getServer().getOnlinePlayers()) {
-            if (online.equals(staff) || online.hasPermission("havocsus.hidefromlist")) {
+            if (online.equals(staff) || isHidden(online)) {
                 continue;
             }
             candidates.add(online);
@@ -118,6 +132,10 @@ public final class WatchDialog {
         for (Player target : candidates) {
             buttons.add(watchButton(staff, target));
         }
+        buttons.add(ActionButton.create(
+                Component.text("Back", ACCENT), null, 150,
+                DialogAction.customClick(
+                        (view, audience) -> runSync(() -> openMenu(staff)), clickOptions())));
 
         // Single column reads better for a short list; two once it gets long.
         int columns = buttons.size() <= 6 ? 1 : 2;
@@ -257,23 +275,15 @@ public final class WatchDialog {
                 DialogAction.customClick(
                         (view, audience) -> runSync(() -> openTopAlerts(staff, 0)), clickOptions())));
 
-        if (plugin.bans().isAvailable()) {
-            buttons.add(ActionButton.create(
-                    Component.text("Ban list  (" + bans.size() + ")", DANGER),
-                    Component.text("Currently active bans", MUTED),
-                    150,
-                    DialogAction.customClick(
-                            (view, audience) -> runSync(() -> openBanList(staff, 0)), clickOptions())));
-        } else {
-            buttons.add(ActionButton.create(
-                    Component.text("Ban list", DANGER),
-                    Component.text("Runs /banlist in chat", MUTED),
-                    150,
-                    DialogAction.customClick(
-                            (view, audience) -> runSync(() ->
-                                    plugin.getServer().dispatchCommand(staff, "banlist")),
-                            clickOptions())));
-        }
+        // Always a dialog, even with zero bans or no hook - a button that does
+        // nothing visible is worse than a screen that says "none".
+        buttons.add(ActionButton.create(
+                Component.text("Ban list" + (plugin.bans().isAvailable()
+                        ? "  (" + bans.size() + ")" : ""), DANGER),
+                Component.text("Currently active bans", MUTED),
+                150,
+                DialogAction.customClick(
+                        (view, audience) -> runSync(() -> openBanList(staff, 0)), clickOptions())));
 
         buttons.add(ActionButton.create(
                 Component.text("Punish a player", DANGER),
@@ -307,7 +317,7 @@ public final class WatchDialog {
     public void openPunishPicker(Player staff) {
         List<Player> candidates = new ArrayList<>();
         for (Player online : plugin.getServer().getOnlinePlayers()) {
-            if (!online.equals(staff) && !online.hasPermission("havocsus.hidefromlist")) {
+            if (!online.equals(staff) && !isHidden(online)) {
                 candidates.add(online);
             }
         }
@@ -405,7 +415,9 @@ public final class WatchDialog {
         List<DialogBody> body = new ArrayList<>();
         if (all.isEmpty()) {
             body.add(DialogBody.plainMessage(Component.text(
-                    "No active bans cached. Try /banlist.", MUTED)));
+                    plugin.bans().isAvailable()
+                            ? "No active bans."
+                            : "Ban data isn't readable from here.", MUTED)));
         }
 
         int pages = Math.max(1, (all.size() + LIST_LINES - 1) / LIST_LINES);
@@ -428,6 +440,16 @@ public final class WatchDialog {
         }
 
         List<ActionButton> buttons = new ArrayList<>();
+        if (all.isEmpty()) {
+            buttons.add(ActionButton.create(
+                    Component.text("Run /banlist", MUTED),
+                    Component.text("Ask DonutPunishments directly, in chat", MUTED),
+                    150,
+                    DialogAction.customClick(
+                            (view, audience) -> runSync(() ->
+                                    plugin.getServer().dispatchCommand(staff, "banlist")),
+                            clickOptions())));
+        }
         addPaging(buttons, current, pages,
                 p -> openBanList(staff, p), () -> openMenu(staff));
 
@@ -654,18 +676,38 @@ public final class WatchDialog {
     /** Shared plumbing so every screen is built the same way. */
     private void showScreen(Player staff, Component title, List<DialogBody> body,
                             List<ActionButton> buttons, ActionButton exitButton) {
-        int columns = buttons.size() <= 6 ? 1 : 2;
+        List<ActionButton> safeButtons = new ArrayList<>(buttons);
+
+        // A multi-action dialog with zero buttons is not a valid dialog, and
+        // trying to show one means the screen silently never opens. An empty
+        // list is a normal state here (nobody online, no bans), so guarantee a
+        // way back instead of letting it fail.
+        if (safeButtons.isEmpty()) {
+            safeButtons.add(ActionButton.create(
+                    Component.text("Back", ACCENT), null, 150,
+                    DialogAction.customClick(
+                            (view, audience) -> runSync(() -> openMenu(staff)),
+                            clickOptions())));
+        }
+
+        int columns = safeButtons.size() <= 6 ? 1 : 2;
         final List<DialogBody> finalBody = List.copyOf(body);
-        final List<ActionButton> finalButtons = List.copyOf(buttons);
+        final List<ActionButton> finalButtons = List.copyOf(safeButtons);
 
-        Dialog dialog = Dialog.create(builder -> builder.empty()
-                .base(DialogBase.builder(title)
-                        .canCloseWithEscape(true)
-                        .body(finalBody)
-                        .build())
-                .type(DialogType.multiAction(finalButtons, exitButton, columns)));
+        try {
+            Dialog dialog = Dialog.create(builder -> builder.empty()
+                    .base(DialogBase.builder(title)
+                            .canCloseWithEscape(true)
+                            .body(finalBody)
+                            .build())
+                    .type(DialogType.multiAction(finalButtons, exitButton, columns)));
 
-        staff.showDialog(dialog);
+            staff.showDialog(dialog);
+        } catch (Throwable t) {
+            plugin.getLogger().warning("Could not show dialog (" + finalButtons.size()
+                    + " buttons, " + finalBody.size() + " body lines): " + t);
+            staff.sendMessage(plugin.settings().msg("dialog-failed"));
+        }
     }
 
     private static TextColor colourFor(String type) {
@@ -730,7 +772,15 @@ public final class WatchDialog {
      * hops back onto the server thread first.
      */
     private void runSync(Runnable action) {
-        plugin.getServer().getScheduler().runTask(plugin, action);
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            try {
+                action.run();
+            } catch (Throwable t) {
+                // Without this, a failure inside a button callback vanishes into
+                // the scheduler and the button just looks dead.
+                plugin.getLogger().warning("Dialog action failed: " + t);
+            }
+        });
     }
 
     private void startWatch(Player staff, java.util.UUID targetId) {

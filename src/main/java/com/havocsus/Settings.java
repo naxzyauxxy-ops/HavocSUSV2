@@ -50,6 +50,7 @@ public final class Settings {
         DEFAULT_MESSAGES.put("list-header", "<gray>Click a name to teleport and watch them:</gray>");
         DEFAULT_MESSAGES.put("list-empty", "<gray>Nobody else is online.</gray>");
         DEFAULT_MESSAGES.put("player-not-found", "<red><name> isn't online.</red>");
+        DEFAULT_MESSAGES.put("dialog-failed", "<red>That screen couldn't be opened.</red> <gray>Check console for details.</gray>");
         DEFAULT_MESSAGES.put("punish-header", "<gray>Punishment options for <white><target></white>:</gray>");
         DEFAULT_MESSAGES.put("punish-empty", "<red>No punishment reasons are configured.</red>");
         DEFAULT_MESSAGES.put("already-in-session", "<red>You're already in a session.</red> <gray>Use <white>/hs quit</white> first.</gray>");

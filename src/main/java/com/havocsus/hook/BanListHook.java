@@ -48,11 +48,15 @@ public final class BanListHook {
             return;
         }
         try {
-            Class<?> cache = Class.forName("xyz.ezstudio.ban.BanCache");
+            // Load through DonutPunishments' OWN classloader. Class.forName here
+            // uses HavocSus's loader, which is not guaranteed to see another
+            // plugin's classes - that lookup failing is why the ban list fell
+            // back to chat.
+            Class<?> cache = loadFromOwner("xyz.ezstudio.ban.BanCache");
             byUuidField = cache.getDeclaredField("BY_UUID");
             byUuidField.setAccessible(true);
 
-            Class<?> entry = Class.forName("xyz.ezstudio.ban.BanCache$BanEntry");
+            Class<?> entry = loadFromOwner("xyz.ezstudio.ban.BanCache$BanEntry");
             idField = field(entry, "id");
             playerField = field(entry, "player");
             reasonField = field(entry, "reason");
@@ -64,6 +68,18 @@ public final class BanListHook {
             plugin.getLogger().info("Ban list dialog unavailable (" + t.getClass().getSimpleName()
                     + ") - the ban list button will run /banlist instead.");
         }
+    }
+
+    private Class<?> loadFromOwner(String name) throws ClassNotFoundException {
+        var owner = plugin.getServer().getPluginManager().getPlugin("DonutPunishments");
+        if (owner != null) {
+            try {
+                return owner.getClass().getClassLoader().loadClass(name);
+            } catch (ClassNotFoundException ignored) {
+                // fall through to our own loader
+            }
+        }
+        return Class.forName(name);
     }
 
     private static Field field(Class<?> type, String name) throws NoSuchFieldException {

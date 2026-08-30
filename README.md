@@ -118,6 +118,12 @@ All queries run **off the main thread** on a timer into a cache; the dialogs nev
 
 The ban list is read reflectively from DonutPunishments' `BanCache` (unobfuscated, public fields). If that ever fails, the button falls back to running `/banlist` in chat rather than breaking.
 
+## A note on `havocsus.hidefromlist`
+
+It is an **opt-out** node, and it is ignored unless you set `watch-list.respect-hide-permission: true`.
+
+The reason: any admin holding a wildcard (`*` or `havocsus.*` in LuckPerms) matches that node, disappears from every list, and the lists come back empty on a server where the only people online are staff. Leave it off unless you have deliberately configured the node.
+
 ## Commands still work normally
 
 The dialogs are a convenience, not a replacement. `/punish`, `/ban`, `/kick`, `/mute`, `/banlist`, `/alts`, `/banhistory` and the rest are all on the command whitelist, so you can type them by hand at any time, including mid-session. Only vanish commands are hard-denied.

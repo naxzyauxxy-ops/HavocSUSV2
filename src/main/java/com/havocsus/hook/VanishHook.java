@@ -41,7 +41,10 @@ public final class VanishHook {
             return;
         }
         try {
-            Class<?> api = Class.forName("de.myzelyam.api.vanish.VanishAPI");
+            // Resolve through PremiumVanish's own classloader first, for the
+            // same reason as the ban hook: our loader isn't guaranteed to see
+            // another plugin's classes.
+            Class<?> api = loadFromOwner("de.myzelyam.api.vanish.VanishAPI");
             hidePlayer = api.getMethod("hidePlayer", Player.class);
             showPlayer = api.getMethod("showPlayer", Player.class);
             isInvisible = api.getMethod("isInvisible", Player.class);
@@ -49,6 +52,18 @@ public final class VanishHook {
         } catch (Throwable t) {
             plugin.getLogger().warning("PremiumVanish is installed but its API could not be resolved: " + t);
         }
+    }
+
+    private Class<?> loadFromOwner(String name) throws ClassNotFoundException {
+        var owner = plugin.getServer().getPluginManager().getPlugin("PremiumVanish");
+        if (owner != null) {
+            try {
+                return owner.getClass().getClassLoader().loadClass(name);
+            } catch (ClassNotFoundException ignored) {
+                // fall through
+            }
+        }
+        return Class.forName(name);
     }
 
     public boolean isAvailable() {
@@ -106,7 +121,7 @@ public final class VanishHook {
             return;
         }
         try {
-            Class<?> raw = Class.forName("de.myzelyam.api.vanish.PlayerShowEvent");
+            Class<?> raw = loadFromOwner("de.myzelyam.api.vanish.PlayerShowEvent");
             if (!Event.class.isAssignableFrom(raw)) {
                 return;
             }
