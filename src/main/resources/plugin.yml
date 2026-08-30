@@ -11,7 +11,7 @@ softdepend:
 commands:
   havocsus:
     description: Manage escort sessions.
-    usage: /havocsus <spec|quit|status|radius|reload>
+    usage: /havocsus <list|spec|quit|status|radius|reload>
     aliases:
       - escort
       - hs
@@ -25,6 +25,9 @@ permissions:
     default: op
     children:
       havocsus.use: true
+  havocsus.hidefromlist:
+    description: Hides this player from the /sus watch list.
+    default: false
   havocsus.patrol:
     description: Allows /escort spec - free vanished spectate with no leash.
     default: op

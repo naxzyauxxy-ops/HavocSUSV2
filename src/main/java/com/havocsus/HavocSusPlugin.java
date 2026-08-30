@@ -1,12 +1,19 @@
 package com.havocsus;
 
 import com.havocsus.command.EscortCommand;
+import com.havocsus.command.SusCommandRegistrar;
+import com.havocsus.dialog.WatchDialog;
 import com.havocsus.escort.EscortManager;
 import com.havocsus.hook.SusHook;
 import com.havocsus.hook.VanishHook;
 import com.havocsus.listener.EscortListener;
 import com.havocsus.listener.SusBridgeListener;
+import com.havocsus.escort.EscortSession;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import org.bukkit.Location;
 import org.bukkit.command.PluginCommand;
+import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -18,6 +25,8 @@ public final class HavocSusPlugin extends JavaPlugin {
     private VanishHook vanishHook;
     private SusHook susHook;
     private EscortManager escortManager;
+    private SusCommandRegistrar susCommandRegistrar;
+    private WatchDialog watchDialog;
 
     @Override
     public void onEnable() {
@@ -40,12 +49,23 @@ public final class HavocSusPlugin extends JavaPlugin {
             pluginCommand.setTabCompleter(command);
         }
 
+        this.susCommandRegistrar = new SusCommandRegistrar(this);
+        susCommandRegistrar.register();
+
+        if (WatchDialog.isSupported()) {
+            this.watchDialog = new WatchDialog(this);
+        } else {
+            getLogger().info("Dialog API not available (needs 1.21.7+) - "
+                    + "the watch list will be shown in chat instead.");
+        }
+
         escortManager.startTasks();
 
         getLogger().info("Enabled v" + getPluginMeta().getVersion()
                 + " | SUS: " + (susHook.isAvailable() ? "hooked" : "MISSING")
                 + " | PremiumVanish: " + (vanishHook.isAvailable() ? "hooked" : "MISSING")
-                + " | /sus direct-teleport: " + (settings.susDirectTeleport ? "on" : "off"));
+                + " | /sus: " + (susCommandRegistrar.hasClaimedSus() ? "registered by us" : "intercepted")
+                + " | dialogs: " + (watchDialog != null ? "yes" : "chat fallback"));
     }
 
     /**
@@ -97,6 +117,58 @@ public final class HavocSusPlugin extends JavaPlugin {
             HandlerList.unregisterAll(this);
         } catch (Throwable ignored) {
             // shutting down anyway - never throw out of onDisable
+        }
+    }
+
+    /** Teleports staff to a player and starts a leashed watch session. */
+    public void startWatch(Player staff, Player target) {
+        if (staff == null || target == null || staff.equals(target)) {
+            return;
+        }
+        Location origin = staff.getLocation().clone();
+        EscortSession existing = escortManager.session(staff);
+        if (existing != null) {
+            existing.allowNextTeleport();
+        }
+        escortManager.clearPending(staff);
+        staff.teleport(target.getLocation());
+        escortManager.engage(staff, target, origin);
+    }
+
+    /** Opens the watch list - a dialog where supported, chat otherwise. */
+    public void openWatchList(Player staff) {
+        if (watchDialog != null) {
+            try {
+                watchDialog.open(staff);
+                return;
+            } catch (Throwable t) {
+                getLogger().warning("Dialog failed to open, falling back to chat: " + t);
+            }
+        }
+        sendChatWatchList(staff);
+    }
+
+    /**
+     * Fallback for servers without the Dialog API, and a safety net if building
+     * the dialog ever throws. Clickable names, same behaviour.
+     */
+    private void sendChatWatchList(Player staff) {
+        staff.sendMessage(settings().msg("list-header"));
+        int shown = 0;
+        for (Player online : getServer().getOnlinePlayers()) {
+            if (online.equals(staff) || online.hasPermission("havocsus.hidefromlist")) {
+                continue;
+            }
+            staff.sendMessage(MiniMessage.miniMessage().deserialize(
+                    "<gray> » <click:run_command:'/escort " + online.getName() + "'>"
+                            + "<hover:show_text:'<green>Click to watch " + online.getName() + "'>"
+                            + "<white><name></white></hover></click> <dark_gray><world></dark_gray>",
+                    Placeholder.unparsed("name", online.getName()),
+                    Placeholder.unparsed("world", online.getWorld().getName())));
+            shown++;
+        }
+        if (shown == 0) {
+            staff.sendMessage(settings().msg("list-empty"));
         }
     }
 

@@ -68,6 +68,29 @@ Aliases: `/havocsus`, `/hs`.
 - `havocsus.bypass.commands` — ignores the command whitelist mid-escort (but *not* `always-denied-commands`)
 - `havocsus.bypass.vanish` — may un-vanish during an escort
 
+## The `/sus` command
+
+HavocSus registers `/sus` itself **only if no other plugin already provides it**, checked at enable time. That check matters: declaring `sus` as an alias in `plugin.yml` would be a coin flip on load order, and losing it would exile SUS's own command to `sus:sus` and break its GUI. So:
+
+- **SUS installed** → SUS keeps `/sus`. HavocSus intercepts it (see below).
+- **SUS not installed** → HavocSus provides `/sus` itself.
+
+Either way the command exists. Disable with `sus-command.register-if-absent: false`.
+
+| | |
+|---|---|
+| `/sus` | Opens the watch list |
+| `/sus <player>` | Teleports straight to them and starts watching |
+| `/escort list` | Same watch list, whoever owns `/sus` |
+
+## The watch list dialog
+
+On 1.21.7+ the list is a real dialog screen (Minecraft's dialog feature, not a chest GUI): one button per online player, tooltips showing their world, plus a Free spectate button.
+
+All Dialog API usage is confined to `WatchDialog`, which is only loaded after a `Class.forName` check. On older servers, or if building the dialog ever throws, it falls back to a clickable chat list with identical behaviour.
+
+Dialog callbacks arrive off the main thread, so every click hops back onto the server thread before teleporting or changing gamemode.
+
 ## `/sus <player>` — direct teleport
 
 SUS's own `/sus <player>` opens that player's **history GUI**; it doesn't teleport (its player branch calls `GuiManager`, not `TeleportManager`). Only a left-click on a head in the main GUI teleports. So there was no way to go straight to someone without opening a menu.

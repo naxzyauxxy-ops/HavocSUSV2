@@ -47,6 +47,9 @@ public final class Settings {
         DEFAULT_MESSAGES.put("interaction-blocked", "<red>You can't touch the world while escorting.</red>");
         DEFAULT_MESSAGES.put("gamemode-locked", "<red>Gamemode is locked during an escort.</red> <gray>Double-shift instead.</gray>");
         DEFAULT_MESSAGES.put("not-escorting", "<red>You aren't in an escort session.</red>");
+        DEFAULT_MESSAGES.put("list-header", "<gray>Click a name to teleport and watch them:</gray>");
+        DEFAULT_MESSAGES.put("list-empty", "<gray>Nobody else is online.</gray>");
+        DEFAULT_MESSAGES.put("player-not-found", "<red><name> isn't online.</red>");
         DEFAULT_MESSAGES.put("patrol-started", "<gray>Free spectate. <aqua>Vanished</aqua>, no leash - watch anyone you like.");
         DEFAULT_MESSAGES.put("patrol-hint", "<dark_gray>Double-shift for <white><mode></white> · <white>/escort quit</white> to leave. Building and commands stay locked.</dark_gray>");
         DEFAULT_MESSAGES.put("patrol-disabled", "<red>Free spectate is disabled on this server.</red>");
@@ -68,6 +71,7 @@ public final class Settings {
     public boolean restoreLocationOnExit = true;
     public int detectWindowTicks = 60;
     public boolean susDirectTeleport = true;
+    public boolean registerSusIfAbsent = true;
     public Set<String> susPassthroughArgs = new HashSet<>();
     public boolean ignoreRightClick = true;
 
@@ -118,6 +122,7 @@ public final class Settings {
         restoreLocationOnExit = c.getBoolean("engage.restore-location-on-exit", true);
         detectWindowTicks = Math.max(5, c.getInt("engage.detect-window-ticks", 60));
         susDirectTeleport = c.getBoolean("sus-command.direct-teleport", true);
+        registerSusIfAbsent = c.getBoolean("sus-command.register-if-absent", true);
         susPassthroughArgs = new HashSet<>();
         List<String> passthrough = c.getStringList("sus-command.passthrough-args");
         if (passthrough.isEmpty()) {

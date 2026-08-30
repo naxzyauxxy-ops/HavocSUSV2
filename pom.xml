@@ -6,16 +6,16 @@
 
     <groupId>com.havocsus</groupId>
     <artifactId>HavocSus</artifactId>
-    <version>1.0.2</version>
+    <version>1.1.0</version>
     <packaging>jar</packaging>
     <name>HavocSus</name>
     <description>Bridges SUS and PremiumVanish: leashed spectator escort for staff investigating flagged players.</description>
 
     <properties>
         <java.version>21</java.version>
-        <!-- Compiling against 1.21.4 API. Anything in the 1.21.x line works at runtime
+        <!-- Compiling against the 1.21.11 API - the Dialog API needs 1.21.7+. Anything in the 1.21.x line works at runtime
              because plugin.yml declares api-version 1.21. Bump freely. -->
-        <paper.version>1.21.4-R0.1-SNAPSHOT</paper.version>
+        <paper.version>1.21.11-R0.1-SNAPSHOT</paper.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 

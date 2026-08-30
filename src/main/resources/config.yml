@@ -46,6 +46,12 @@ sus-command:
   #   /sus reload | clear    SUS admin commands
   #   /sus <offline name>    SUS's history GUI, so lookups keep working
   direct-teleport: true
+  # If NO other plugin provides /sus, HavocSus registers it itself, so the
+  # command always exists. Checked at enable time - if SUS is installed it
+  # keeps /sus and we only intercept, never steal it.
+  #   /sus            opens the watch list (dialog screen on 1.21.7+)
+  #   /sus <player>   teleports straight to them and starts watching
+  register-if-absent: true
   # Arguments that must always fall through to SUS untouched.
   passthrough-args:
     - reload
@@ -145,6 +151,9 @@ messages:
   interaction-blocked: "<red>You can't touch the world while escorting.</red>"
   gamemode-locked: "<red>Gamemode is locked during an escort.</red> <gray>Double-shift instead.</gray>"
   not-escorting: "<red>You aren't in an escort session.</red>"
+  list-header: "<gray>Click a name to teleport and watch them:</gray>"
+  list-empty: "<gray>Nobody else is online.</gray>"
+  player-not-found: "<red><name> isn't online.</red>"
   patrol-started: "<gray>Free spectate. <aqua>Vanished</aqua>, no leash - watch anyone you like."
   patrol-hint: "<dark_gray>Double-shift for <white><mode></white> · <white>/escort quit</white> to leave. Building and commands stay locked.</dark_gray>"
   patrol-disabled: "<red>Free spectate is disabled on this server.</red>"
