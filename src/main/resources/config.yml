@@ -1,0 +1,158 @@
+# ---------------------------------------------------------------------------
+#  HavocSus
+#  Click a flagged player in the SUS GUI -> you get teleported (by SUS) ->
+#  HavocSus takes over: vanished spectator, leashed to that player.
+# ---------------------------------------------------------------------------
+
+engage:
+  # Put staff in spectator the moment SUS teleports them to a flagged player.
+  spectator-on-teleport: true
+  # Vanish staff via PremiumVanish on engage (and un-vanish on exit, unless
+  # they were already vanished before the session started).
+  auto-vanish: true
+  # Send staff back to where they were standing when the session ends.
+  restore-location-on-exit: true
+  # How long (ticks) after a SUS GUI click we still treat an incoming teleport
+  # as "that click". SUS teleports asynchronously, so leave some slack.
+  detect-window-ticks: 60
+  # SUS 1.0.7+ split the GUI click: LEFT-click teleports, RIGHT-click dismisses
+  # the flag without moving you. Leave this true so dismissing a flag doesn't
+  # arm an escort. Set false only if you're on SUS 1.0.5 or older, where every
+  # click teleported.
+  ignore-right-click: true
+
+leash:
+  # Hard limit, in blocks, from the flagged player.
+  radius: 150
+  # Start nagging at this distance.
+  warn-at: 140
+  # Push staff back to the boundary if they somehow end up outside it
+  # (e.g. the flagged player sprinted away, or a teleport slipped through).
+  pull-back: true
+  # Live distance/mode readout on the action bar.
+  action-bar: true
+  # If the flagged player changes world, drag staff along instead of ending.
+  follow-world-change: true
+
+sus-command:
+  # Makes `/sus <online player>` teleport you straight to them and start a
+  # watch session, instead of opening that player's history GUI.
+  #
+  # SUS's own /sus <player> does NOT teleport - it opens a history menu - so
+  # without this the only way to reach someone is /sus, then click their head.
+  #
+  # Left alone entirely:
+  #   /sus                  the normal SUS GUI (clicking a head still works)
+  #   /sus reload | clear    SUS admin commands
+  #   /sus <offline name>    SUS's history GUI, so lookups keep working
+  direct-teleport: true
+  # Arguments that must always fall through to SUS untouched.
+  passthrough-args:
+    - reload
+    - clear
+    - help
+    - history
+
+patrol:
+  # Free spectate mode: /hs spec  (aliases: /hs patrol, /escort spec)
+  #
+  # This is the replacement for dropping into spectator by hand. You get
+  # vanished spectator with NO leash and NO target lock, so you can watch
+  # anyone on the server, flagged or not - but you still can't break, place,
+  # loot or run anything outside the command whitelist.
+  #
+  # Leave with /escort quit, same as an escort. Permission: havocsus.patrol
+  enabled: true
+
+double-sneak:
+  enabled: true
+  # Max milliseconds between the two shifts.
+  window-ms: 350
+  # What "solid" mode means. SURVIVAL, ADVENTURE or CREATIVE.
+  survival-gamemode: SURVIVAL
+  # Give flight in solid mode (staff are vanished anyway).
+  allow-flight: false
+
+restrictions:
+  # Stop staff using the spectator menu to jump to *other* players.
+  # This is the big one - without it spectator mode is a free map tour.
+  block-spectate-other-entities: true
+  # Block any teleport that would land outside the leash radius.
+  block-external-teleports: true
+  # Break and place are blocked outright, in BOTH spectator and solid mode.
+  block-block-changes: true
+  # Also block hitting, looting, dropping and container access in solid mode.
+  block-interactions-in-active-mode: true
+  # Block gamemode changes from other plugins during a session.
+  lock-gamemode: true
+
+  # HARD DENY. Refused even for holders of havocsus.bypass.commands.
+  # The whitelist below already refuses these - this is the second lock, so a
+  # staffer with the bypass permission still can't drop vanish mid-escort.
+  always-denied-commands:
+    - v
+    - vanish
+    - pv
+    - premiumvanish
+    - unvanish
+    - vanishtoggle
+    - vis
+    - invisible
+
+  # Cancels any attempt to UN-VANISH during a session, whatever triggers it -
+  # PremiumVanish's hotbar toggle item, a staff GUI, another plugin calling the
+  # API. Commands aren't the only way to become visible, so blocking /v alone
+  # leaves a hole. Bypass permission: havocsus.bypass.vanish.
+  lock-vanish: true
+
+  # WHITELIST. Any command not on this list is refused while escorting.
+  # (Bypass permission: havocsus.bypass.commands)
+  #
+  #   havocsus / escort / hs are listed so staff can always run
+  #   `/escort quit` and get out. Delete them if you want them gone too -
+  #   just know that leaves double-shift and disconnecting as the only exits.
+  allowed-commands:
+    - punish
+    - sus
+    - suspicious
+    - havocsus
+    - escort
+    - hs
+
+sounds:
+  enabled: true
+  engage: BLOCK_BEACON_ACTIVATE
+  release: BLOCK_BEACON_DEACTIVATE
+  toggle: UI_BUTTON_CLICK
+  wall: BLOCK_NOTE_BLOCK_BASS
+
+messages:
+  prefix: "<gradient:#5b8cff:#a45bff><bold>Escort</bold></gradient> <dark_gray>»</dark_gray> "
+  engaged: "<gray>Escorting <white><target></white>. You are <aqua>vanished</aqua> and locked within <yellow><radius></yellow> blocks."
+  engaged-hint: "<dark_gray>Double-shift to drop into <white><mode></white> · <white>/escort quit</white> to leave.</dark_gray>"
+  retargeted: "<gray>Now escorting <white><target></white>.</gray>"
+  released: "<gray>Escort ended. <dark_gray>(<reason>)</dark_gray>"
+  target-left: "<red><target></red> left the server."
+  mode-spectator: "<aqua>Spectator.</aqua> <dark_gray>You pass through blocks; nobody can see you.</dark_gray>"
+  mode-active: "<green><mode>.</green> <dark_gray>Still vanished, still leashed.</dark_gray>"
+  wall: "<red>Leash limit.</red> <gray>You can't get more than <yellow><radius></yellow> blocks from <white><target></white>.</gray>"
+  pulled-back: "<red>Pulled back to the leash boundary.</red>"
+  spectate-blocked: "<red>You may only spectate <white><target></white> during an escort.</red>"
+  teleport-blocked: "<red>That teleport would break the escort leash.</red>"
+  command-blocked: "<red>/<command> is blocked during an escort.</red> <gray>Only <white>/punish</white> and <white>/sus</white> are allowed.</gray>"
+  vanish-locked: "<red>You can't un-vanish during an escort.</red> <gray>Use <white>/escort quit</white> first.</gray>"
+  build-blocked: "<red>You can't break or place blocks during an escort.</red>"
+  interaction-blocked: "<red>You can't touch the world while escorting.</red>"
+  gamemode-locked: "<red>Gamemode is locked during an escort.</red> <gray>Double-shift instead.</gray>"
+  not-escorting: "<red>You aren't in an escort session.</red>"
+  patrol-started: "<gray>Free spectate. <aqua>Vanished</aqua>, no leash - watch anyone you like."
+  patrol-hint: "<dark_gray>Double-shift for <white><mode></white> · <white>/escort quit</white> to leave. Building and commands stay locked.</dark_gray>"
+  patrol-disabled: "<red>Free spectate is disabled on this server.</red>"
+  already-in-session: "<red>You're already in a session.</red> <gray>Use <white>/escort quit</white> first.</gray>"
+  action-bar-patrol: "<gray>Patrol <dark_gray>|</dark_gray> <mode>"
+  action-bar: "<gray><target> <dark_gray>|</dark_gray> <distance>/<radius>m <dark_gray>|</dark_gray> <mode>"
+  action-bar-warn: "<red><target> <dark_gray>|</dark_gray> <distance>/<radius>m <dark_gray>|</dark_gray> <mode>"
+  reloaded: "<green>Config reloaded.</green>"
+  radius-set: "<green>Leash radius set to <yellow><radius></yellow> blocks.</green>"
+  no-permission: "<red>No permission.</red>"
+  usage: "<gray>/escort <white>spec</white> · <white>quit</white> · <white>status</white> · <white>radius <n></white> · <white>reload</white></gray>"

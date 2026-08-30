@@ -1,0 +1,42 @@
+name: HavocSus
+version: '${project.version}'
+main: com.havocsus.HavocSusPlugin
+api-version: '1.21'
+author: HavocSus
+description: Leashed spectator escort - staff who teleport to a flagged player via SUS get locked into a vanished spectator bubble around them.
+softdepend:
+  - Sus
+  - PremiumVanish
+
+commands:
+  havocsus:
+    description: Manage escort sessions.
+    usage: /havocsus <spec|quit|status|radius|reload>
+    aliases:
+      - escort
+      - hs
+
+permissions:
+  havocsus.use:
+    description: Allows being placed into an escort session and using /havocsus quit|status.
+    default: op
+  havocsus.admin:
+    description: Allows /havocsus reload and /havocsus radius.
+    default: op
+    children:
+      havocsus.use: true
+  havocsus.patrol:
+    description: Allows /escort spec - free vanished spectate with no leash.
+    default: op
+  havocsus.bypass:
+    description: Never gets placed into an escort session at all.
+    default: false
+  havocsus.bypass.leash:
+    description: Escorted, but not distance-limited.
+    default: false
+  havocsus.bypass.commands:
+    description: May run blocked commands while escorting.
+    default: false
+  havocsus.bypass.vanish:
+    description: May un-vanish during an escort. Off by default on purpose.
+    default: false
