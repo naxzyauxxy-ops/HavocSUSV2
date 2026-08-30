@@ -93,8 +93,16 @@ public final class WatchDialog {
         }
         buttons.add(patrolButton(staff));
 
+        // Single column reads better for a short list; two once it gets long.
+        int columns = buttons.size() <= 6 ? 1 : 2;
+
         final List<DialogBody> finalBody = List.copyOf(body);
         final List<ActionButton> finalButtons = List.copyOf(buttons);
+        final ActionButton exitButton = ActionButton.create(
+                Component.text("Close", MUTED),
+                null,
+                100,
+                null); // null action simply dismisses the dialog
 
         Dialog dialog = Dialog.create(builder -> builder.empty()
                 .base(DialogBase.builder(
@@ -102,7 +110,11 @@ public final class WatchDialog {
                         .canCloseWithEscape(true)
                         .body(finalBody)
                         .build())
-                .type(DialogType.multiAction(finalButtons)));
+                // NOTE: the single-argument multiAction() returns a
+                // MultiActionType.Builder, not a DialogType. This three-argument
+                // overload returns the type itself and takes the exit button and
+                // column count with it.
+                .type(DialogType.multiAction(finalButtons, exitButton, columns)));
 
         staff.showDialog(dialog);
     }
