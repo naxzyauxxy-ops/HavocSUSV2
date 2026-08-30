@@ -741,15 +741,50 @@ public final class WatchDialog {
                 tooltip,
                 150,
                 DialogAction.customClick(
-                        (view, audience) -> runSync(() -> {
-                            if (staff.isOnline()) {
-                                // Dispatched as the staff member so their
-                                // permissions apply and the punishment is
-                                // attributed to them, not to console.
-                                plugin.getServer().dispatchCommand(staff, command);
-                            }
-                        }),
+                        (view, audience) -> runSync(() -> runPunish(staff, target, reason, command)),
                         clickOptions()));
+    }
+
+    /**
+     * Runs the punishment and, crucially, says what happened.
+     *
+     * Silently firing a command and hoping is how "banning doesn't work" turns
+     * into an unanswerable bug report - the refusal (missing permission, an
+     * exempt target, an unknown reason key) is printed by the punishment plugin
+     * and easily missed behind a dialog. So we echo the exact command, report a
+     * dispatch that wasn't accepted, and log both.
+     */
+    private void runPunish(Player staff, Player target, PunishHook.Reason reason, String command) {
+        if (!staff.isOnline()) {
+            return;
+        }
+        boolean console = plugin.getConfig().getBoolean("punish.run-as-console", false);
+        boolean accepted;
+        try {
+            accepted = console
+                    ? plugin.getServer().dispatchCommand(
+                            plugin.getServer().getConsoleSender(), command)
+                    // Default: as the staff member, so their permissions apply
+                    // and the punishment is attributed to them.
+                    : plugin.getServer().dispatchCommand(staff, command);
+        } catch (Throwable t) {
+            accepted = false;
+            plugin.getLogger().warning("Punish command threw for /" + command + ": " + t);
+        }
+
+        if (accepted) {
+            staff.sendMessage(plugin.settings().msg("punish-sent",
+                    "<target>", target.getName(),
+                    "<reason>", reason.key()));
+            if (plugin.getConfig().getBoolean("punish.log-commands", true)) {
+                plugin.getLogger().info(staff.getName() + " ran /" + command);
+            }
+        } else {
+            staff.sendMessage(plugin.settings().msg("punish-failed", "<command>", command));
+            plugin.getLogger().warning("Punish command was not accepted: /" + command
+                    + " (is DonutPunishments loaded, and does " + staff.getName()
+                    + " have punishments.punish?)");
+        }
     }
 
     private static String prettify(String key) {

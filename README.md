@@ -124,6 +124,17 @@ It is an **opt-out** node, and it is ignored unless you set `watch-list.respect-
 
 The reason: any admin holding a wildcard (`*` or `havocsus.*` in LuckPerms) matches that node, disappears from every list, and the lists come back empty on a server where the only people online are staff. Leave it off unless you have deliberately configured the node.
 
+## If a punishment doesn't apply
+
+The dialog now echoes the exact command it ran and logs it, so a refusal is visible instead of looking like a dead button. Two things account for most failures:
+
+- **The staff member lacks `punishments.punish`.** Set `punish.run-as-console: true` if you'd rather not grant it, at the cost of the punishment being attributed to console.
+- **The target holds `punishments.exempt`.** This bites the same way `havocsus.hidefromlist` did: any wildcard (`*` or `punishments.*` in LuckPerms) matches it, so testing on another staff account will silently refuse the ban. Test on a non-staff account, or check the target's permissions.
+
+## Leaving spectator
+
+Double-shifting out of spectator **does not move you**. It used to scan downward for ground and teleport there, which from any height dropped you at the bottom of the world, and inside caves or over the void left you somewhere useless. If you're in mid-air when you switch, `double-sneak.hover-if-airborne` keeps you hovering rather than falling.
+
 ## Commands still work normally
 
 The dialogs are a convenience, not a replacement. `/punish`, `/ban`, `/kick`, `/mute`, `/banlist`, `/alts`, `/banhistory` and the rest are all on the command whitelist, so you can type them by hand at any time, including mid-session. Only vanish commands are hard-denied.

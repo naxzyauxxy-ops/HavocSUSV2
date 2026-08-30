@@ -93,6 +93,12 @@ punish:
   # The command each button runs. Dispatched AS the staff member, so their
   # permissions apply and the punishment is attributed to them.
   command: "punish %player% %reason%"
+  # Run as console instead of as the staff member. Leave false so punishments
+  # are attributed to whoever issued them; set true only if your staff don't
+  # hold punishments.punish themselves.
+  run-as-console: false
+  # Log every punishment fired from the dialog to console.
+  log-commands: true
   # Only used if DonutPunishments isn't installed or its messages.yml is
   # unreadable. Format: key|type|duration
   fallback-reasons:
@@ -165,6 +171,9 @@ double-sneak:
   survival-gamemode: SURVIVAL
   # Give flight in solid mode (staff are vanished anyway).
   allow-flight: false
+  # Leaving spectator never moves you. If you drop out of spectator in mid-air
+  # this hovers you in place instead of letting you fall.
+  hover-if-airborne: true
 
 restrictions:
   # Stop staff using the spectator menu to jump to *other* players.
@@ -176,6 +185,12 @@ restrictions:
   block-block-changes: true
   # Also block hitting, looting, dropping and container access in solid mode.
   block-interactions-in-active-mode: true
+  # Block opening or clicking in ANOTHER player's inventory during a session -
+  # the /invsee and /openinv case. Applies in both modes, since the whole point
+  # is that staff investigate without touching the suspect's items.
+  block-player-inventories: true
+  # Block picking up dropped items during a session.
+  block-item-pickup: true
   # Block gamemode changes from other plugins during a session.
   lock-gamemode: true
 
@@ -248,6 +263,7 @@ messages:
   command-blocked: "<red>/<command> is blocked during an escort.</red> <gray>Only <white>/punish</white> and <white>/sus</white> are allowed.</gray>"
   vanish-locked: "<red>You can't un-vanish during an escort.</red> <gray>Use <white>/hs quit</white> first.</gray>"
   build-blocked: "<red>You can't break or place blocks during an escort.</red>"
+  inventory-blocked: "<red>You can't open another player's inventory while escorting.</red>"
   interaction-blocked: "<red>You can't touch the world while escorting.</red>"
   gamemode-locked: "<red>Gamemode is locked during an escort.</red> <gray>Double-shift instead.</gray>"
   not-escorting: "<red>You aren't in an escort session.</red>"
@@ -256,6 +272,8 @@ messages:
   player-not-found: "<red><name> isn't online.</red>"
   dialog-failed: "<red>That screen couldn't be opened.</red> <gray>Check console for details.</gray>"
   punish-header: "<gray>Punishment options for <white><target></white>:</gray>"
+  punish-sent: "<gray>Ran punishment <white><reason></white> on <white><target></white>.</gray>"
+  punish-failed: "<red>The command <white>/<command></white> was not accepted.</red> <gray>Is DonutPunishments loaded, and do you have <white>punishments.punish</white>?</gray>"
   punish-empty: "<red>No punishment reasons are configured.</red>"
   already-in-session: "<red>You're already in a session.</red> <gray>Use <white>/hs quit</white> first.</gray>"
   action-bar: "<gray><target> <dark_gray>|</dark_gray> <distance>/<radius>m <dark_gray>|</dark_gray> <mode>"

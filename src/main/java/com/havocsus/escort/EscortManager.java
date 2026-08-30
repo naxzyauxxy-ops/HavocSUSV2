@@ -19,6 +19,9 @@ import java.util.UUID;
 
 public final class EscortManager {
 
+    /** Blocks to look down before deciding staff are in mid-air. */
+    private static final int AIRBORNE_CHECK = 4;
+
     /** A SUS click we've seen, waiting for the teleport it triggers. */
     public record Pending(UUID target, Location origin, long expiresAtMs) {
         boolean expired() {
@@ -179,14 +182,24 @@ public final class EscortManager {
                     staff.sendMessage(s.msg("mode-spectator"));
                 }
             } else {
-                // Coming out of spectator you may be inside terrain or 200 blocks
-                // up. Put them somewhere they won't instantly die.
-                Location safe = findSafeLanding(staff.getLocation());
-                if (safe != null && safe.distanceSquared(staff.getLocation()) > 0.01D) {
-                    staff.teleport(safe);
-                }
+                // Leaving spectator does NOT move you.
+                //
+                // This used to scan downward for ground and teleport you there,
+                // so dropping out of spectator from any height dumped you at the
+                // bottom of the world - and inside caves or over the void it
+                // landed you somewhere useless or lethal. Staying put is what
+                // staff expect; the only thing needed is not to plummet.
                 staff.setGameMode(s.activeGameMode);
-                staff.setAllowFlight(s.activeAllowFlight || s.activeGameMode == GameMode.CREATIVE);
+
+                boolean airborne = isAirborne(staff.getLocation());
+                boolean flight = s.activeAllowFlight
+                        || s.activeGameMode == GameMode.CREATIVE
+                        || (s.hoverIfAirborne && airborne);
+                staff.setAllowFlight(flight);
+                if (flight && airborne) {
+                    // Hover in place rather than fall out of the sky.
+                    staff.setFlying(true);
+                }
                 if (announce) {
                     staff.sendMessage(s.msg("mode-active",
                             "<mode>", capitalise(s.activeGameMode.name())));
@@ -369,10 +382,27 @@ public final class EscortManager {
         }
     }
 
+    /** True if there's no ground within a few blocks underfoot. */
+    private boolean isAirborne(Location location) {
+        World world = location.getWorld();
+        if (world == null) {
+            return false;
+        }
+        int x = location.getBlockX();
+        int z = location.getBlockZ();
+        int startY = location.getBlockY();
+        for (int y = startY; y >= Math.max(world.getMinHeight(), startY - AIRBORNE_CHECK); y--) {
+            if (world.getBlockAt(x, y, z).getType().isSolid()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /**
      * Walks down from the given location looking for ground with two blocks of
-     * headroom, so leaving spectator doesn't drop staff inside bedrock or off a
-     * 300-block cliff.
+     * headroom. Used only by the leash pull-back, where staff are being moved
+     * anyway - never by the spectator toggle.
      */
     public Location findSafeLanding(Location origin) {
         World world = origin.getWorld();

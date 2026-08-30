@@ -44,6 +44,7 @@ public final class Settings {
         DEFAULT_MESSAGES.put("command-blocked", "<red>/<command> is blocked during an escort.</red> <gray>Only <white>/punish</white> and <white>/sus</white> are allowed.</gray>");
         DEFAULT_MESSAGES.put("vanish-locked", "<red>You can't un-vanish during an escort.</red> <gray>Use <white>/hs quit</white> first.</gray>");
         DEFAULT_MESSAGES.put("build-blocked", "<red>You can't break or place blocks during an escort.</red>");
+        DEFAULT_MESSAGES.put("inventory-blocked", "<red>You can't open another player's inventory while escorting.</red>");
         DEFAULT_MESSAGES.put("interaction-blocked", "<red>You can't touch the world while escorting.</red>");
         DEFAULT_MESSAGES.put("gamemode-locked", "<red>Gamemode is locked during an escort.</red> <gray>Double-shift instead.</gray>");
         DEFAULT_MESSAGES.put("not-escorting", "<red>You aren't in an escort session.</red>");
@@ -52,6 +53,8 @@ public final class Settings {
         DEFAULT_MESSAGES.put("player-not-found", "<red><name> isn't online.</red>");
         DEFAULT_MESSAGES.put("dialog-failed", "<red>That screen couldn't be opened.</red> <gray>Check console for details.</gray>");
         DEFAULT_MESSAGES.put("punish-header", "<gray>Punishment options for <white><target></white>:</gray>");
+        DEFAULT_MESSAGES.put("punish-sent", "<gray>Ran punishment <white><reason></white> on <white><target></white>.</gray>");
+        DEFAULT_MESSAGES.put("punish-failed", "<red>The command <white>/<command></white> was not accepted.</red> <gray>Is DonutPunishments loaded, and do you have <white>punishments.punish</white>?</gray>");
         DEFAULT_MESSAGES.put("punish-empty", "<red>No punishment reasons are configured.</red>");
         DEFAULT_MESSAGES.put("already-in-session", "<red>You're already in a session.</red> <gray>Use <white>/hs quit</white> first.</gray>");
         DEFAULT_MESSAGES.put("action-bar", "<gray><target> <dark_gray>|</dark_gray> <distance>/<radius>m <dark_gray>|</dark_gray> <mode>");
@@ -88,12 +91,15 @@ public final class Settings {
     public long doubleSneakWindowMs = 350L;
     public GameMode activeGameMode = GameMode.SURVIVAL;
     public boolean activeAllowFlight = false;
+    public boolean hoverIfAirborne = true;
 
     // restrictions
     public boolean blockSpectateOthers = true;
     public boolean blockExternalTeleports = true;
     public boolean blockBlockChanges = true;
     public boolean blockInteractions = true;
+    public boolean blockPlayerInventories = true;
+    public boolean blockItemPickup = true;
     public boolean lockGameMode = true;
     public boolean lockVanish = true;
     public Set<String> allowedCommands = new HashSet<>();
@@ -144,11 +150,14 @@ public final class Settings {
         doubleSneakWindowMs = Math.max(80L, c.getLong("double-sneak.window-ms", 350L));
         activeGameMode = parseGameMode(c.getString("double-sneak.survival-gamemode", "SURVIVAL"));
         activeAllowFlight = c.getBoolean("double-sneak.allow-flight", false);
+        hoverIfAirborne = c.getBoolean("double-sneak.hover-if-airborne", true);
 
         blockSpectateOthers = c.getBoolean("restrictions.block-spectate-other-entities", true);
         blockExternalTeleports = c.getBoolean("restrictions.block-external-teleports", true);
         blockBlockChanges = c.getBoolean("restrictions.block-block-changes", true);
         blockInteractions = c.getBoolean("restrictions.block-interactions-in-active-mode", true);
+        blockPlayerInventories = c.getBoolean("restrictions.block-player-inventories", true);
+        blockItemPickup = c.getBoolean("restrictions.block-item-pickup", true);
         lockGameMode = c.getBoolean("restrictions.lock-gamemode", true);
         lockVanish = c.getBoolean("restrictions.lock-vanish", true);
 

@@ -14,7 +14,9 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.player.PlayerAttemptPickupItemEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerGameModeChangeEvent;
@@ -299,27 +301,72 @@ public final class EscortListener implements Listener {
         if (!(event.getPlayer() instanceof Player staff)) {
             return;
         }
-        if (!shouldBlockInteraction(staff)) {
+        if (plugin.escorts().session(staff) == null) {
             return;
         }
         InventoryHolder holder = event.getInventory().getHolder();
 
-        // Only real world containers are blocked - chests, barrels, furnaces,
-        // hoppers, minecarts, horses. Virtual inventories (holder is null or a
-        // plugin's own InventoryHolder) are left alone, otherwise /punish and
-        // /sus would open a menu and immediately have it slammed shut.
-        boolean worldContainer = holder instanceof BlockState || holder instanceof Entity;
-        if (!worldContainer) {
+        // Someone ELSE's inventory. This is the invsee / openinv case, and the
+        // holder being a Player used to short-circuit straight to "allow",
+        // which let staff open and empty the inventory of the very player they
+        // were investigating.
+        if (holder instanceof Player owner && !owner.getUniqueId().equals(staff.getUniqueId())) {
+            if (plugin.settings().blockPlayerInventories) {
+                event.setCancelled(true);
+                notify(staff, "inventory-blocked");
+            }
             return;
         }
         if (holder instanceof Player) {
             return; // their own inventory / ender chest
         }
+
+        if (!shouldBlockInteraction(staff)) {
+            return;
+        }
+
+        // Real world containers only - chests, barrels, furnaces, hoppers,
+        // minecarts, horses. Virtual inventories (holder null or a plugin's own
+        // InventoryHolder) are left alone, otherwise /punish and /sus would open
+        // a menu and have it slammed shut.
+        boolean worldContainer = holder instanceof BlockState || holder instanceof Entity;
+        if (!worldContainer) {
+            return;
+        }
         event.setCancelled(true);
         notifyInteractionBlocked(staff);
     }
 
-    /** Building is denied for the whole session, regardless of mode. */
+    /**
+     * Backstop for the open blocker: if another plugin puts staff into a view of
+     * someone else's inventory without a cancellable open event, clicks in the
+     * top half still go nowhere.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player staff)) {
+            return;
+        }
+        if (plugin.escorts().session(staff) == null || !plugin.settings().blockPlayerInventories) {
+            return;
+        }
+        InventoryHolder holder = event.getView().getTopInventory().getHolder();
+        if (holder instanceof Player owner && !owner.getUniqueId().equals(staff.getUniqueId())) {
+            event.setCancelled(true);
+            notify(staff, "inventory-blocked");
+        }
+    }
+
+    /** No hoovering up the suspect's drops mid-investigation. */
+    @EventHandler(ignoreCancelled = true)
+    public void onPickup(PlayerAttemptPickupItemEvent event) {
+        Player staff = event.getPlayer();
+        if (plugin.escorts().session(staff) == null || !plugin.settings().blockItemPickup) {
+            return;
+        }
+        event.setCancelled(true);
+    }
+
     private boolean shouldBlockBuilding(Player player) {
         return plugin.settings().blockBlockChanges && plugin.escorts().isEscorting(player);
     }
