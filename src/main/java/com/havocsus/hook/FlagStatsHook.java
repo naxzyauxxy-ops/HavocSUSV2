@@ -95,10 +95,15 @@ public final class FlagStatsHook {
             return false;
         }
         Plugin sus = plugin.getServer().getPluginManager().getPlugin("Sus");
-        File dataFolder = sus != null
-                ? sus.getDataFolder()
-                : new File(plugin.getDataFolder().getParentFile(), "Sus");
+        if (sus == null) {
+            // Not a fault. HavocSus captures alerts itself; the SUS database is
+            // only ever a source of history from before it was running.
+            lastError = "SUS not installed - using live capture only";
+            dbDescription = "none (SUS not installed)";
+            return false;
+        }
 
+        File dataFolder = sus.getDataFolder();
         File configFile = new File(dataFolder, "config.yml");
         if (!configFile.isFile()) {
             lastError = "SUS config not found at " + configFile.getPath();
@@ -452,8 +457,9 @@ public final class FlagStatsHook {
     /** Human-readable state, for /hs diag. */
     public List<String> diagnostics() {
         List<String> lines = new ArrayList<>();
-        lines.add("SUS plugin: " + (plugin.getServer().getPluginManager().getPlugin("Sus") != null
-                ? "found" : "MISSING"));
+        boolean susPresent = plugin.getServer().getPluginManager().getPlugin("Sus") != null;
+        lines.add("SUS plugin: " + (susPresent
+                ? "found" : "not installed (live capture only - this is fine)"));
         lines.add("Database: " + dbDescription);
         lines.add("Connection: " + (jdbcUrl == null ? "not resolved" : "resolved"));
         lines.add("Summary table: " + (summaryTable == null ? "none" : summaryTable));

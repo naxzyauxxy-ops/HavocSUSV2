@@ -93,11 +93,21 @@ There's a "Stop watching" button on that screen too, since `/escort quit` no lon
 
 If DonutPunishments is missing or its file is unreadable, `punish.fallback-reasons` in HavocSus's config is used instead.
 
+## SUS is optional
+
+HavocSus captures alerts from the anti-cheats itself, so the SUS plugin is not required. If it isn't installed, `/hs diag` says so and everything else works — the SUS database is only ever a source of history from before HavocSus was running. Without SUS, HavocSus also registers `/sus` itself.
+
 ## Where check data comes from
 
 **Live capture is the primary source.** Every supported anti-cheat fires its own Bukkit event when it flags someone. HavocSus hooks those events reflectively from descriptions in `alerts.sources`, so if an alert reaches chat it reaches the checks page — no dependence on SUS's storage being present, populated or shaped as expected.
 
 The SUS database is now only a supplement, supplying history from before the server came up. The two are **not added together**: SUS records the same alerts, so summing would double-count. Live data wins whenever it exists for a player.
+
+### Auto-discovery
+
+Hardcoded class names don't scale — they vary per anti-cheat and per version, and most are paid so they can't be verified up front. `alerts.auto-scan` is the safety net: for each installed anti-cheat it opens that plugin's **own jar**, finds classes that look like flag events (`FlagEvent`, `ViolationEvent`, and so on), loads them through that plugin's classloader and binds whatever is genuinely a Bukkit event, using generic getter names.
+
+That's how anti-cheats whose API nobody documented get picked up. Events named flag/violation are preferred; alert/detect names are only used when there are none, so the same alert isn't counted twice.
 
 ### Fixing a source without a rebuild
 
@@ -113,7 +123,9 @@ alerts:
       violation: "getViolations,getVl"
 ```
 
-Run **`/hs diag`**. It prints one line per source: `hooked (FlagEvent)`, `not installed`, or the error. If a source says "not installed" while that anti-cheat *is* running, the class name is wrong for your version — correct it and run `/hs reload`. No rebuild.
+Run **`/hs diag`**. It prints one line per source with the number of alerts actually seen: `hooked (FlagEvent), 12 seen`, `not installed`, or the error.
+
+A source that says **`hooked but no player found`** is bound to the right event but can't read the player off it — correct the `player` mapping and `/hs reload`. That state used to be indistinguishable from "no alerts yet", which is what made this hard to pin down. If a source says "not installed" while that anti-cheat *is* running, the class name is wrong for your version — correct it and run `/hs reload`. No rebuild.
 
 `check` and `violation` accept a Check object, an enum or a String; the bridge asks it for `getCheckName`/`getName`/`getType` as needed.
 
