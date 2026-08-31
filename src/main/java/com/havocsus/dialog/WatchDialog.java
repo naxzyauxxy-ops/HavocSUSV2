@@ -69,8 +69,13 @@ public final class WatchDialog {
      * Only servers that have actually set the node up should turn this on.
      */
     private boolean isHidden(Player player) {
-        return plugin.getConfig().getBoolean("watch-list.respect-hide-permission", false)
-                && player.hasPermission("havocsus.hidefromlist");
+        if (plugin.getConfig().getBoolean("watch-list.respect-hide-permission", false)
+                && player.hasPermission("havocsus.hidefromlist")) {
+            return true;
+        }
+        // Staff aren't watch targets, and someone already being watched by
+        // another staff member isn't available either.
+        return plugin.isWatchProtected(player) || plugin.watcherOf(player) != null;
     }
 
     public static boolean isSupported() {

@@ -137,14 +137,7 @@ public final class EscortCommand implements CommandExecutor, TabCompleter {
             staff.sendMessage(plugin.settings().msg("usage"));
             return true;
         }
-        EscortSession existing = plugin.escorts().session(staff);
-        if (existing != null) {
-            existing.allowNextTeleport();
-        }
-        // Snapshot before the teleport, so /escort quit returns them here.
-        Location origin = staff.getLocation().clone();
-        staff.teleport(target.getLocation());
-        plugin.escorts().engage(staff, target, origin);
+        plugin.startWatch(staff, target);
         return true;
     }
 

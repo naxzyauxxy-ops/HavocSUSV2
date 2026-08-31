@@ -93,6 +93,25 @@ There's a "Stop watching" button on that screen too, since `/escort quit` no lon
 
 If DonutPunishments is missing or its file is unreadable, `punish.fallback-reasons` in HavocSus's config is used instead.
 
+## Chat alerts
+
+Anti-cheat flags are announced to holders of `havocsus.alerts` as a single clickable line:
+
+```
+[!] Notch failed Killaura (Vulcan · vl 12) · 34 total
+```
+
+Clicking teleports you to them and starts watching.
+
+Keeping it un-annoying is the point, so there are two throttles: a short one per player (20s) and a longer one per player-and-check (60s). The line carries the running total rather than repeating per hit, so a cheater tripping the same check thirty times a minute produces one line, not thirty. `min-violation` hides low-level noise; `skip-staff` keeps staff flags out of chat.
+
+## Who can be watched
+
+- **Staff can't be watched.** `watch-list.exclude-staff` treats anyone with `havocsus.use` or `havocsus.exempt` as off-limits, and they're hidden from the lists. This matches wildcard holders, which on most setups is exactly the staff team.
+- **One watcher per player.** If someone is already being watched, a second staff member is told who has them rather than both landing on the same suspect. They also drop out of the watch list while occupied.
+
+Both are enforced in `engage()` itself, not only at the command layer — the SUS GUI path reaches `engage()` directly, and a guard on one route isn't a guard.
+
 ## SUS is optional
 
 HavocSus captures alerts from the anti-cheats itself, so the SUS plugin is not required. If it isn't installed, `/hs diag` says so and everything else works — the SUS database is only ever a source of history from before HavocSus was running. Without SUS, HavocSus also registers `/sus` itself.

@@ -53,6 +53,10 @@ public final class Settings {
         DEFAULT_MESSAGES.put("list-header", "<gray>Click a name to teleport and watch them:</gray>");
         DEFAULT_MESSAGES.put("list-empty", "<gray>Nobody else is online.</gray>");
         DEFAULT_MESSAGES.put("player-not-found", "<red><name> isn't online.</red>");
+        DEFAULT_MESSAGES.put("alert-line", "<dark_gray>[<red>!</red>]</dark_gray> <white><player></white> <gray>failed</gray> <yellow><check></yellow> <dark_gray>(<anticheat> · vl <vl>)</dark_gray> <gray>·</gray> <red><total></red> <gray>total</gray>");
+        DEFAULT_MESSAGES.put("alert-hover", "<green>Click to teleport and watch <white><player></white></green>");
+        DEFAULT_MESSAGES.put("cannot-watch-staff", "<red>You can't watch another staff member.</red>");
+        DEFAULT_MESSAGES.put("already-watched", "<red><target> is already being watched by <white><staff></white>.</red>");
         DEFAULT_MESSAGES.put("dialog-failed", "<red>That screen couldn't be opened.</red> <gray>Check console for details.</gray>");
         DEFAULT_MESSAGES.put("punish-header", "<gray>Punishment options for <white><target></white>:</gray>");
         DEFAULT_MESSAGES.put("punish-sent", "<gray>Ran punishment <white><reason></white> on <white><target></white>.</gray>");
@@ -227,6 +231,11 @@ public final class Settings {
     /** Same as {@link #msg} but without the prefix - used for action bars. */
     public Component bare(String key, String... replacements) {
         return MM.deserialize(raw(key, replacements));
+    }
+
+    /** Raw message text, for callers that build their own Component. */
+    public String rawMessage(String key) {
+        return raw(key);
     }
 
     private String raw(String key, String... replacements) {

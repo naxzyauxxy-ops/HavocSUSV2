@@ -49,6 +49,17 @@ watch-list:
   # full of staff. Only turn this on if you've actually set the node up.
   respect-hide-permission: false
 
+  # Staff can't be watched, and can't be spectated by other staff.
+  #
+  # This matches wildcard permission holders, which on most setups IS the staff
+  # team - the intent here. If a normal player somehow holds a wildcard they'd
+  # become unwatchable; turn this off if that's your situation.
+  exclude-staff: true
+
+  # Only one staff member may watch a given player at a time. The second gets
+  # told who already has them.
+  one-staff-per-target: true
+
 elytra:
   # A gliding suspect outruns anything on foot, and the leash would just
   # rubber-band you. When the target takes off, snap to them and attach
@@ -74,6 +85,26 @@ alerts:
   top-limit: 60
   # Leave blank to auto-detect. MySQL setups usually prefix tables with sus_.
   table-prefix: ""
+
+  # CHAT ALERTS
+  #
+  # A cheater trips the same check dozens of times a minute, so one line per
+  # flag would bury real chat. Two throttles keep it usable: a short one per
+  # player, and a longer one per player-and-check. The line carries the running
+  # total instead of repeating.
+  chat:
+    enabled: true
+    permission: "havocsus.alerts"
+    # Seconds before the same player can trigger another alert line.
+    cooldown-seconds: 20
+    # Seconds before the same player AND check can alert again.
+    per-check-cooldown-seconds: 60
+    # Ignore flags below this violation level. 0 shows everything.
+    min-violation: 0
+    # Don't announce flags on staff.
+    skip-staff: true
+    # What clicking the alert runs. %player% is substituted.
+    click-command: "/hs %player%"
 
   # LIVE CAPTURE - the primary source of check data.
   #
@@ -401,6 +432,10 @@ messages:
   list-header: "<gray>Click a name to teleport and watch them:</gray>"
   list-empty: "<gray>Nobody else is online.</gray>"
   player-not-found: "<red><name> isn't online.</red>"
+  alert-line: "<dark_gray>[<red>!</red>]</dark_gray> <white><player></white> <gray>failed</gray> <yellow><check></yellow> <dark_gray>(<anticheat> · vl <vl>)</dark_gray> <gray>·</gray> <red><total></red> <gray>total</gray>"
+  alert-hover: "<green>Click to teleport and watch <white><player></white></green>"
+  cannot-watch-staff: "<red>You can't watch another staff member.</red>"
+  already-watched: "<red><target> is already being watched by <white><staff></white>.</red>"
   dialog-failed: "<red>That screen couldn't be opened.</red> <gray>Check console for details.</gray>"
   punish-header: "<gray>Punishment options for <white><target></white>:</gray>"
   punish-sent: "<gray>Ran punishment <white><reason></white> on <white><target></white>.</gray>"

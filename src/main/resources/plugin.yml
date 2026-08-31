@@ -32,6 +32,12 @@ permissions:
     default: op
     children:
       havocsus.use: true
+  havocsus.alerts:
+    description: Receives anti-cheat alert lines in chat.
+    default: op
+  havocsus.exempt:
+    description: Cannot be watched or spectated by staff.
+    default: false
   havocsus.hidefromlist:
     description: Hides this player from the /sus watch list.
     default: false

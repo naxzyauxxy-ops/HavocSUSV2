@@ -163,6 +163,20 @@ public final class EscortManager {
         }
         Settings s = plugin.settings();
 
+        // Enforced here as well as in startWatch, because the GUI path reaches
+        // engage() directly and a guard on only one route isn't a guard.
+        if (plugin.isWatchProtected(target)) {
+            staff.sendMessage(s.msg("cannot-watch-staff", "<target>", target.getName()));
+            return;
+        }
+        Player watcher = plugin.watcherOf(target);
+        if (watcher != null && !watcher.equals(staff)) {
+            staff.sendMessage(s.msg("already-watched",
+                    "<target>", target.getName(),
+                    "<staff>", watcher.getName()));
+            return;
+        }
+
         EscortSession existing = sessions.get(staff.getUniqueId());
         if (existing != null) {
             // Switching suspects mid-session keeps the ORIGINAL return point,

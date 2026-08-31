@@ -5,6 +5,7 @@ import com.havocsus.command.SusCommandRegistrar;
 import com.havocsus.dialog.WatchDialog;
 import com.havocsus.escort.EscortManager;
 import com.havocsus.alerts.AlertBridge;
+import com.havocsus.alerts.AlertNotifier;
 import com.havocsus.alerts.AlertStore;
 import com.havocsus.hook.BanListHook;
 import com.havocsus.hook.FlagStatsHook;
@@ -37,6 +38,7 @@ public final class HavocSusPlugin extends JavaPlugin {
     private BanListHook banListHook;
     private AlertStore alertStore;
     private AlertBridge alertBridge;
+    private AlertNotifier alertNotifier;
 
     @Override
     public void onEnable() {
@@ -49,6 +51,7 @@ public final class HavocSusPlugin extends JavaPlugin {
         this.susHook = new SusHook(this);
         this.punishHook = new PunishHook(this);
         this.alertStore = new AlertStore();
+        this.alertNotifier = new AlertNotifier(this, alertStore);
         this.flagStatsHook = new FlagStatsHook(this, alertStore);
         this.banListHook = new BanListHook(this);
         this.escortManager = new EscortManager(this);
@@ -139,9 +142,49 @@ public final class HavocSusPlugin extends JavaPlugin {
         }
     }
 
+    /**
+     * Whether this player is off-limits as a watch target.
+     *
+     * Staff shouldn't be spectating each other. Note this deliberately matches
+     * wildcard permission holders - on most setups that IS the staff team, which
+     * is the intent here. If a normal player somehow holds a wildcard they'd
+     * become unwatchable, so it's switchable.
+     */
+    public boolean isWatchProtected(Player player) {
+        if (player == null || !getConfig().getBoolean("watch-list.exclude-staff", true)) {
+            return false;
+        }
+        return player.hasPermission("havocsus.use") || player.hasPermission("havocsus.exempt");
+    }
+
+    /** The staff member already watching this player, or null. */
+    public Player watcherOf(Player target) {
+        if (target == null || !getConfig().getBoolean("watch-list.one-staff-per-target", true)) {
+            return null;
+        }
+        for (EscortSession session : escortManager.sessionsTargeting(target.getUniqueId())) {
+            Player watcher = session.staff();
+            if (watcher != null && watcher.isOnline()) {
+                return watcher;
+            }
+        }
+        return null;
+    }
+
     /** Teleports staff to a player and starts a leashed watch session. */
     public void startWatch(Player staff, Player target) {
         if (staff == null || target == null || staff.equals(target)) {
+            return;
+        }
+        if (isWatchProtected(target)) {
+            staff.sendMessage(settings().msg("cannot-watch-staff", "<target>", target.getName()));
+            return;
+        }
+        Player watcher = watcherOf(target);
+        if (watcher != null && !watcher.equals(staff)) {
+            staff.sendMessage(settings().msg("already-watched",
+                    "<target>", target.getName(),
+                    "<staff>", watcher.getName()));
             return;
         }
         Location origin = staff.getLocation().clone();
@@ -288,6 +331,10 @@ public final class HavocSusPlugin extends JavaPlugin {
 
     public AlertStore alertStore() {
         return alertStore;
+    }
+
+    public AlertNotifier alertNotifier() {
+        return alertNotifier;
     }
 
     public AlertBridge alertBridge() {

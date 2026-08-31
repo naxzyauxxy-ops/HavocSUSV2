@@ -163,8 +163,16 @@ public final class AlertBridge {
             hits.merge(source.id(), 1, Integer::sum);
             String check = resolveString(event, source.checkGetters());
             double violation = resolveDouble(event, source.violationGetters());
-            store.record(player.getUniqueId(), player.getName(),
-                    prettyId(source.id()), check, violation);
+            String antiCheat = prettyId(source.id());
+            store.record(player.getUniqueId(), player.getName(), antiCheat, check, violation);
+
+            // Anti-cheat events can fire off the main thread; chat and any
+            // follow-up must not.
+            final Player flagged = player;
+            final String checkName = check;
+            final double vl = violation;
+            plugin.getServer().getScheduler().runTask(plugin,
+                    () -> plugin.alertNotifier().announce(flagged, antiCheat, checkName, vl));
         } catch (Throwable t) {
             // A malformed mapping must never break the anti-cheat's own event.
             results.put(source.id(), "error: " + t);
