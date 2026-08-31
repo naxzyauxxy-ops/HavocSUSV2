@@ -84,6 +84,10 @@ public final class EscortCommand implements CommandExecutor, TabCompleter {
             for (String line : plugin.flagStats().diagnostics()) {
                 staff.sendMessage(net.kyori.adventure.text.Component.text("  " + line));
             }
+            staff.sendMessage(net.kyori.adventure.text.Component.text("  Anticheat sources:"));
+            plugin.alertBridge().results().forEach((id, state) ->
+                    staff.sendMessage(net.kyori.adventure.text.Component.text(
+                            "    " + id + ": " + state)));
             staff.sendMessage(net.kyori.adventure.text.Component.text(
                     "  Punish reasons loaded: " + plugin.punishments().reasons().size()));
             staff.sendMessage(net.kyori.adventure.text.Component.text(

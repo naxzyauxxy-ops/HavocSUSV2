@@ -93,7 +93,31 @@ There's a "Stop watching" button on that screen too, since `/escort quit` no lon
 
 If DonutPunishments is missing or its file is unreadable, `punish.fallback-reasons` in HavocSus's config is used instead.
 
-## If the checks page is empty
+## Where check data comes from
+
+**Live capture is the primary source.** Every supported anti-cheat fires its own Bukkit event when it flags someone. HavocSus hooks those events reflectively from descriptions in `alerts.sources`, so if an alert reaches chat it reaches the checks page — no dependence on SUS's storage being present, populated or shaped as expected.
+
+The SUS database is now only a supplement, supplying history from before the server came up. The two are **not added together**: SUS records the same alerts, so summing would double-count. Live data wins whenever it exists for a player.
+
+### Fixing a source without a rebuild
+
+The class and method names in `alerts.sources` are best-effort — most of these anti-cheats are paid and I can't verify their APIs. So they're config, not code:
+
+```yaml
+alerts:
+  sources:
+    grim:
+      event: "ac.grim.grimac.api.events.FlagEvent"
+      player: "getPlayer,getUser"     # tried in order
+      check: "getCheck,getCheckName"
+      violation: "getViolations,getVl"
+```
+
+Run **`/hs diag`**. It prints one line per source: `hooked (FlagEvent)`, `not installed`, or the error. If a source says "not installed" while that anti-cheat *is* running, the class name is wrong for your version — correct it and run `/hs reload`. No rebuild.
+
+`check` and `violation` accept a Check object, an enum or a String; the bridge asks it for `getCheckName`/`getName`/`getType` as needed.
+
+## If the checks page is still empty
 
 Run `/hs diag`. It reports whether SUS was found, which database file was opened, which tables were matched, how many rows are cached, and the last error — which turns "nothing shows" into an actual cause.
 

@@ -75,6 +75,72 @@ alerts:
   # Leave blank to auto-detect. MySQL setups usually prefix tables with sus_.
   table-prefix: ""
 
+  # LIVE CAPTURE - the primary source of check data.
+  #
+  # Each anti-cheat fires its own Bukkit event when it flags someone. They share
+  # no interface and most are paid, so HavocSus hooks them reflectively from the
+  # descriptions below rather than compiling against them.
+  #
+  # Anything not installed is skipped silently. Run /hs diag to see exactly
+  # which ones bound - it prints one line per source.
+  #
+  # `player`, `check` and `violation` are comma-separated method names, tried in
+  # order until one works, so a version difference usually just needs another
+  # name adding here. No rebuild required: edit, then /hs reload.
+  #
+  # NOTE: the class names below are best-effort. Verify with /hs diag; a source
+  # that reports "not installed" while that anti-cheat IS running means the class
+  # name needs correcting for your version.
+  sources:
+    grim:
+      enabled: true
+      event: "ac.grim.grimac.api.events.FlagEvent"
+      player: "getPlayer,getUser"
+      check: "getCheck,getCheckName"
+      violation: "getViolations,getViolation,getVl"
+    vulcan:
+      enabled: true
+      event: "me.frep.vulcan.api.event.VulcanFlagEvent"
+      player: "getPlayer"
+      check: "getCheck,getCheckName,getType"
+      violation: "getVl,getViolations"
+    matrix:
+      enabled: true
+      event: "me.rerere.matrix.api.events.PlayerViolationEvent"
+      player: "getPlayer"
+      check: "getHackType,getCheck"
+      violation: "getViolations,getVl"
+    spartan:
+      enabled: true
+      event: "me.vagdedes.spartan.api.PlayerViolationEvent"
+      player: "getPlayer"
+      check: "getHackType,getCheck"
+      violation: "getViolationLevel,getVl"
+    totemguard:
+      enabled: true
+      event: "com.deathmotion.totemguard.api.events.FlagEvent"
+      player: "getPlayer"
+      check: "getCheck,getCheckName"
+      violation: "getViolations,getVl"
+    themis:
+      enabled: true
+      event: "ltd.matrixstudios.themis.api.event.ThemisFlagEvent"
+      player: "getPlayer"
+      check: "getCheck,getCheckName"
+      violation: "getVl,getViolations"
+    boar:
+      enabled: true
+      event: "org.boar.api.event.BoarFlagEvent"
+      player: "getPlayer"
+      check: "getCheck,getCheckName"
+      violation: "getVl,getViolations"
+    polar:
+      enabled: true
+      event: "top.polar.api.event.PlayerViolationEvent"
+      player: "getPlayer,getUser"
+      check: "getCheck,getCheckName"
+      violation: "getVl,getViolations"
+
 sus-command:
   # Makes `/sus <online player>` teleport you straight to them and start a
   # watch session, instead of opening that player's history GUI.

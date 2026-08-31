@@ -1,6 +1,7 @@
 package com.havocsus.hook;
 
 import com.havocsus.HavocSusPlugin;
+import com.havocsus.alerts.AlertStore;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -55,6 +56,7 @@ public final class FlagStatsHook {
     private static final int HISTORY_FALLBACK_LIMIT = 5000;
 
     private final HavocSusPlugin plugin;
+    private final AlertStore live;
 
     private final Map<UUID, PlayerFlags> summaries = new ConcurrentHashMap<>();
     private final Map<UUID, List<CheckStat>> checks = new ConcurrentHashMap<>();
@@ -71,8 +73,9 @@ public final class FlagStatsHook {
     private volatile String lastError = "not resolved yet";
     private volatile String dbDescription = "unknown";
 
-    public FlagStatsHook(HavocSusPlugin plugin) {
+    public FlagStatsHook(HavocSusPlugin plugin, AlertStore live) {
         this.plugin = plugin;
+        this.live = live;
     }
 
     public boolean isAvailable() {
@@ -391,21 +394,57 @@ public final class FlagStatsHook {
     // reads (main thread, cache only)
     // ------------------------------------------------------------------
 
+    /**
+     * Live capture wins over the database.
+     *
+     * If we've seen alerts for this player ourselves, that data is current and
+     * definitely correct. The database is history from before the server came
+     * up. They are not added together - SUS records the same alerts, so summing
+     * would double-count everything.
+     */
     public PlayerFlags summary(UUID uuid) {
+        if (live.has(uuid)) {
+            String name = live.name(uuid);
+            if (name == null) {
+                Player online = plugin.getServer().getPlayer(uuid);
+                name = online != null ? online.getName() : "?";
+            }
+            return new PlayerFlags(uuid, name, live.total(uuid),
+                    live.lastAntiCheat(uuid), live.lastCheck(uuid),
+                    live.lastViolation(uuid), live.lastFlaggedAt(uuid));
+        }
         return summaries.get(uuid);
     }
 
     public int alertCount(UUID uuid) {
+        if (live.has(uuid)) {
+            return live.total(uuid);
+        }
         PlayerFlags flags = summaries.get(uuid);
         return flags == null ? 0 : flags.amount();
     }
 
     public List<CheckStat> checks(UUID uuid) {
+        if (live.has(uuid)) {
+            List<CheckStat> out = new ArrayList<>();
+            for (AlertStore.CheckTally tally : live.checks(uuid)) {
+                out.add(new CheckStat(tally.antiCheat(), tally.checkName(),
+                        tally.amount(), tally.violationLevel(), tally.lastFlaggedAt()));
+            }
+            return out;
+        }
         return checks.getOrDefault(uuid, List.of());
     }
 
     public List<PlayerFlags> topAlerts(int limit) {
-        List<PlayerFlags> all = new ArrayList<>(summaries.values());
+        Map<UUID, PlayerFlags> merged = new HashMap<>(summaries);
+        for (UUID uuid : live.players()) {
+            PlayerFlags fromLive = summary(uuid);
+            if (fromLive != null) {
+                merged.put(uuid, fromLive);
+            }
+        }
+        List<PlayerFlags> all = new ArrayList<>(merged.values());
         all.sort(Comparator.comparingInt(PlayerFlags::amount).reversed());
         return all.size() <= limit ? all : new ArrayList<>(all.subList(0, limit));
     }
@@ -422,6 +461,8 @@ public final class FlagStatsHook {
         lines.add("Cached players: " + summaries.size());
         lines.add("Cached check rows: " + checks.values().stream().mapToInt(List::size).sum());
         lines.add("Last result: " + lastError);
+        lines.add("Live alerts captured: " + live.totalAlerts()
+                + " across " + live.size() + " players");
         return lines;
     }
 }

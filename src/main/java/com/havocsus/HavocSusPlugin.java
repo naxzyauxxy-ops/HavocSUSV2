@@ -4,6 +4,8 @@ import com.havocsus.command.EscortCommand;
 import com.havocsus.command.SusCommandRegistrar;
 import com.havocsus.dialog.WatchDialog;
 import com.havocsus.escort.EscortManager;
+import com.havocsus.alerts.AlertBridge;
+import com.havocsus.alerts.AlertStore;
 import com.havocsus.hook.BanListHook;
 import com.havocsus.hook.FlagStatsHook;
 import com.havocsus.hook.PunishHook;
@@ -33,6 +35,8 @@ public final class HavocSusPlugin extends JavaPlugin {
     private PunishHook punishHook;
     private FlagStatsHook flagStatsHook;
     private BanListHook banListHook;
+    private AlertStore alertStore;
+    private AlertBridge alertBridge;
 
     @Override
     public void onEnable() {
@@ -44,7 +48,8 @@ public final class HavocSusPlugin extends JavaPlugin {
         this.vanishHook = new VanishHook(this);
         this.susHook = new SusHook(this);
         this.punishHook = new PunishHook(this);
-        this.flagStatsHook = new FlagStatsHook(this);
+        this.alertStore = new AlertStore();
+        this.flagStatsHook = new FlagStatsHook(this, alertStore);
         this.banListHook = new BanListHook(this);
         this.escortManager = new EscortManager(this);
 
@@ -68,6 +73,8 @@ public final class HavocSusPlugin extends JavaPlugin {
                     + "the watch list will be shown in chat instead.");
         }
 
+        this.alertBridge = new AlertBridge(this, alertStore);
+        alertBridge.register();
         flagStatsHook.startRefreshTask();
         escortManager.startTasks();
 
@@ -76,7 +83,8 @@ public final class HavocSusPlugin extends JavaPlugin {
                 + " | PremiumVanish: " + (vanishHook.isAvailable() ? "hooked" : "MISSING")
                 + " | /sus: " + (susCommandRegistrar.hasClaimedSus() ? "registered by us" : "intercepted")
                 + " | dialogs: " + (watchDialog != null ? "yes" : "chat fallback")
-                + " | alert stats: " + (flagStatsHook.isAvailable() ? "yes" : "no"));
+                + " | alert db: " + (flagStatsHook.isAvailable() ? "yes" : "no")
+                + " | live anticheat hooks: " + alertBridge.boundCount());
     }
 
     /**
@@ -259,6 +267,11 @@ public final class HavocSusPlugin extends JavaPlugin {
     public void reloadEverything() {
         reloadConfig();
         settings.load();
+        // Rebind anti-cheat sources so corrected class or method names take
+        // effect without a restart - the whole point of them being config.
+        if (alertBridge != null) {
+            alertBridge.register();
+        }
     }
 
     public Settings settings() {
@@ -271,6 +284,14 @@ public final class HavocSusPlugin extends JavaPlugin {
 
     public BanListHook bans() {
         return banListHook;
+    }
+
+    public AlertStore alertStore() {
+        return alertStore;
+    }
+
+    public AlertBridge alertBridge() {
+        return alertBridge;
     }
 
     public FlagStatsHook flagStats() {
