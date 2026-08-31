@@ -142,8 +142,15 @@ public final class HavocSusPlugin extends JavaPlugin {
             existing.allowNextTeleport();
         }
         escortManager.clearPending(staff);
+
+        // Vanish first, then move. The other order gives the suspect a frame of
+        // a staff member appearing next to them.
+        boolean wasVanished = existing != null
+                ? existing.wasAlreadyVanished()
+                : escortManager.prepareVanish(staff);
+
         staff.teleport(target.getLocation());
-        escortManager.engage(staff, target, origin);
+        escortManager.engage(staff, target, origin, wasVanished);
     }
 
     /**

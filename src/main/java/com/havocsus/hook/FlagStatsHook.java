@@ -10,31 +10,33 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Reads alert counts and per-check breakdowns straight out of SUS's own
- * database, read-only.
+ * Reads alert counts and per-check breakdowns from SUS's own database.
  *
- * SUS has no API, but it does have a stable, unobfuscated schema:
+ * SUS has no API, but it does have plain SQL underneath: one table with a row
+ * per player (amount / anti_cheat / last_check / last_violation_level) and one
+ * with a row per (player, anti-cheat, check). UUIDs are stored dashed, via
+ * UUID.toString().
  *
- *   flags         one row per player - amount, anti_cheat, last_check,
- *                 last_violation_level, last_flagged_at
- *   flag_history  one row per (player, anti-cheat, check) - amount,
- *                 violation_level, last_flagged_at
- *
- * Column names survive obfuscation because they're SQL strings, which makes
- * this far more durable than reflecting into their classes would be. We never
- * write, only read.
- *
- * All queries run off the main thread on a timer and land in a cache, so the
- * dialogs never touch JDBC while rendering.
+ * Nothing about the table NAMES is assumed. An earlier version hardcoded them
+ * and probed with "SELECT * FROM flags LIMIT 1", which passes as long as some
+ * table by that name exists - so a wrong guess about the columns sailed through
+ * the probe and then made every real query throw, which in game looked like a
+ * checks page that was simply empty. Tables are now identified by the columns
+ * they actually contain, and resolution retries instead of giving up at startup.
  */
 public final class FlagStatsHook {
 
@@ -46,35 +48,48 @@ public final class FlagStatsHook {
                             double violationLevel, long lastFlaggedAt) {
     }
 
+    /** Names SUS is known to use, tried when the database won't list its tables. */
+    private static final List<String> FALLBACK_TABLES = List.of(
+            "flags", "flag_history", "sus_flags", "sus_flag_history");
+
+    private static final int HISTORY_FALLBACK_LIMIT = 5000;
+
     private final HavocSusPlugin plugin;
 
     private final Map<UUID, PlayerFlags> summaries = new ConcurrentHashMap<>();
     private final Map<UUID, List<CheckStat>> checks = new ConcurrentHashMap<>();
 
-    private volatile boolean available;
     private volatile String jdbcUrl;
     private volatile String user;
     private volatile String password;
-    private volatile String flagsTable = "flags";
-    private volatile String historyTable = "flag_history";
-    private volatile boolean warned;
+
+    /** Row-per-player table. Null if SUS doesn't have one we recognise. */
+    private volatile String summaryTable;
+    /** Row-per-check table. */
+    private volatile String historyTable;
+
+    private volatile String lastError = "not resolved yet";
+    private volatile String dbDescription = "unknown";
 
     public FlagStatsHook(HavocSusPlugin plugin) {
         this.plugin = plugin;
-        resolve();
     }
 
     public boolean isAvailable() {
-        return available;
+        return jdbcUrl != null && (summaryTable != null || historyTable != null);
     }
 
     // ------------------------------------------------------------------
-    // setup
+    // connection
     // ------------------------------------------------------------------
 
-    private void resolve() {
+    private boolean resolveConnection() {
+        if (jdbcUrl != null) {
+            return true;
+        }
         if (!plugin.getConfig().getBoolean("alerts.enabled", true)) {
-            return;
+            lastError = "disabled in config";
+            return false;
         }
         Plugin sus = plugin.getServer().getPluginManager().getPlugin("Sus");
         File dataFolder = sus != null
@@ -83,82 +98,137 @@ public final class FlagStatsHook {
 
         File configFile = new File(dataFolder, "config.yml");
         if (!configFile.isFile()) {
-            plugin.getLogger().info("SUS config not found - alert counts disabled.");
-            return;
+            lastError = "SUS config not found at " + configFile.getPath();
+            return false;
         }
 
         YamlConfiguration susConfig = YamlConfiguration.loadConfiguration(configFile);
-        String type = String.valueOf(susConfig.getString("DATABASE.TYPE", "sqlite")).toLowerCase();
+        String type = String.valueOf(susConfig.getString("DATABASE.TYPE", "sqlite"))
+                .toLowerCase(Locale.ROOT);
 
-        String prefix = plugin.getConfig().getString("alerts.table-prefix", "");
-        if (prefix == null) {
-            prefix = "";
-        }
-
-        if (type.startsWith("mysql")) {
+        if (type.startsWith("mysql") || type.startsWith("maria")) {
             String host = susConfig.getString("DATABASE.MYSQL.HOST", "localhost");
             int port = susConfig.getInt("DATABASE.MYSQL.PORT", 3306);
             String database = susConfig.getString("DATABASE.MYSQL.DATABASE", "sus");
             boolean ssl = susConfig.getBoolean("DATABASE.MYSQL.USE-SSL", false);
-            this.user = susConfig.getString("DATABASE.MYSQL.USER", "root");
-            this.password = susConfig.getString("DATABASE.MYSQL.PASSWORD", "");
-            this.jdbcUrl = "jdbc:mysql://" + host + ":" + port + "/" + database
+            user = susConfig.getString("DATABASE.MYSQL.USER", "root");
+            password = susConfig.getString("DATABASE.MYSQL.PASSWORD", "");
+            jdbcUrl = "jdbc:mysql://" + host + ":" + port + "/" + database
                     + "?useSSL=" + ssl + "&characterEncoding=utf8";
-            if (prefix.isEmpty()) {
-                prefix = susConfig.getString("DATABASE.MYSQL.TABLE-PREFIX", "sus_");
-            }
+            dbDescription = "mysql " + host + ":" + port + "/" + database;
         } else {
             String fileName = susConfig.getString("DATABASE.SQLITE.FILE", "flags.db");
             File db = new File(dataFolder, fileName);
             if (!db.isFile()) {
-                plugin.getLogger().info("SUS database (" + db.getName() + ") not found yet - "
-                        + "alert counts will start working once SUS has recorded a flag.");
-                return;
+                // Not an error - SUS creates this lazily. We just try again later.
+                lastError = "waiting for " + db.getPath() + " to exist";
+                return false;
             }
-            this.jdbcUrl = "jdbc:sqlite:" + db.getAbsolutePath();
-            this.user = null;
-            this.password = null;
+            jdbcUrl = "jdbc:sqlite:" + db.getAbsolutePath();
+            user = null;
+            password = null;
+            dbDescription = "sqlite " + db.getPath();
         }
-
-        this.flagsTable = prefix + "flags";
-        this.historyTable = prefix + "flag_history";
-
-        // Probe, and fall back to unprefixed names if the prefixed ones aren't
-        // there - SQLite and MySQL setups don't agree on whether the prefix is
-        // applied, so guessing once and checking beats assuming.
-        if (!tableExists(flagsTable)) {
-            if (tableExists("flags")) {
-                flagsTable = "flags";
-                historyTable = "flag_history";
-            } else {
-                plugin.getLogger().warning("Could not find SUS's flags table - alert counts disabled.");
-                return;
-            }
-        }
-
-        available = true;
-        plugin.getLogger().info("Alert stats hooked into SUS (" + type + ", table " + flagsTable + ").");
-    }
-
-    private boolean tableExists(String table) {
-        try (Connection connection = connect();
-             PreparedStatement statement = connection.prepareStatement(
-                     "SELECT * FROM " + table + " LIMIT 1")) {
-            statement.executeQuery().close();
-            return true;
-        } catch (Throwable t) {
-            return false;
-        }
+        return true;
     }
 
     private Connection connect() throws Exception {
         if (jdbcUrl == null) {
             throw new IllegalStateException("no database configured");
         }
-        if (user == null) {
-            return DriverManager.getConnection(jdbcUrl);
+        ensureDriver();
+        return user == null
+                ? DriverManager.getConnection(jdbcUrl)
+                : DriverManager.getConnection(jdbcUrl, user, password);
+    }
+
+    /**
+     * Nudges the JDBC driver into registering itself.
+     *
+     * DriverManager discovers drivers via the calling classloader, and the
+     * driver here arrives through Paper's library loader, so an explicit load
+     * is a cheap guard against "No suitable driver" on some setups.
+     */
+    private void ensureDriver() {
+        try {
+            Class.forName(jdbcUrl.startsWith("jdbc:sqlite")
+                    ? "org.sqlite.JDBC"
+                    : "com.mysql.cj.jdbc.Driver");
+        } catch (Throwable ignored) {
+            // If it's genuinely missing, connect() reports it properly.
         }
-        return DriverManager.getConnection(jdbcUrl, user, password);
+    }
+
+    // ------------------------------------------------------------------
+    // schema discovery
+    // ------------------------------------------------------------------
+
+    /** Identifies tables by the columns they contain, not by their names. */
+    private void discoverTables(Connection connection) {
+        String foundSummary = null;
+        String foundHistory = null;
+
+        for (String table : listTables(connection)) {
+            Set<String> columns = columnsOf(connection, table);
+            if (columns.isEmpty() || !columns.contains("player_uuid")) {
+                continue;
+            }
+            // Order matters: the history table also has `amount`, so test for
+            // the per-check columns first.
+            if (foundHistory == null
+                    && columns.contains("check_name") && columns.contains("violation_level")) {
+                foundHistory = table;
+            } else if (foundSummary == null
+                    && columns.contains("amount") && columns.contains("last_check")) {
+                foundSummary = table;
+            }
+        }
+
+        summaryTable = foundSummary;
+        historyTable = foundHistory;
+
+        if (isAvailable()) {
+            lastError = "ok";
+            plugin.getLogger().info("Alert stats hooked into SUS (" + dbDescription
+                    + ", summary=" + summaryTable + ", history=" + historyTable + ").");
+        } else {
+            lastError = "no recognisable flag tables in " + dbDescription;
+        }
+    }
+
+    private List<String> listTables(Connection connection) {
+        Set<String> names = new LinkedHashSet<>();
+        for (String query : List.of(
+                "SELECT name FROM sqlite_master WHERE type='table'",
+                "SHOW TABLES")) {
+            try (Statement statement = connection.createStatement();
+                 ResultSet rs = statement.executeQuery(query)) {
+                while (rs.next()) {
+                    names.add(rs.getString(1));
+                }
+                if (!names.isEmpty()) {
+                    return new ArrayList<>(names);
+                }
+            } catch (Throwable ignored) {
+                // wrong dialect - try the next one
+            }
+        }
+        return FALLBACK_TABLES;
+    }
+
+    private Set<String> columnsOf(Connection connection, String table) {
+        Set<String> columns = new LinkedHashSet<>();
+        try (PreparedStatement statement =
+                     connection.prepareStatement("SELECT * FROM " + table + " WHERE 1=0");
+             ResultSet rs = statement.executeQuery()) {
+            ResultSetMetaData meta = rs.getMetaData();
+            for (int i = 1; i <= meta.getColumnCount(); i++) {
+                columns.add(meta.getColumnLabel(i).toLowerCase(Locale.ROOT));
+            }
+        } catch (Throwable ignored) {
+            // not a table we can read; skip it
+        }
+        return columns;
     }
 
     // ------------------------------------------------------------------
@@ -172,58 +242,95 @@ public final class FlagStatsHook {
 
     /** Runs off the main thread. Never call this from a dialog or listener. */
     public void refresh() {
-        if (!available) {
+        if (!resolveConnection()) {
             return;
         }
         List<UUID> online = new ArrayList<>();
-        // getOnlinePlayers is safe to read here, but copy immediately.
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             online.add(player.getUniqueId());
         }
+
         try (Connection connection = connect()) {
-            // Summaries cover everyone who has ever been flagged, so the
-            // leaderboard still works when the offender is offline.
+            // Retry discovery every cycle until it sticks. SUS creates its
+            // tables lazily, so failing once at startup must not be permanent.
+            if (!isAvailable()) {
+                discoverTables(connection);
+                if (!isAvailable()) {
+                    return;
+                }
+            }
             loadSummaries(connection);
             if (online.isEmpty()) {
                 checks.clear();
             } else {
                 loadChecks(connection, online);
             }
+            lastError = "ok";
         } catch (Throwable t) {
-            if (!warned) {
-                warned = true;
-                plugin.getLogger().warning("Could not read SUS alert data: " + t
-                        + " (this warning won't repeat)");
-            }
+            lastError = t.toString();
+            plugin.getLogger().warning("Could not read SUS alert data: " + t);
         }
     }
 
     private void loadSummaries(Connection connection) throws Exception {
         Map<UUID, PlayerFlags> loaded = new HashMap<>();
-        String sql = "SELECT player_uuid, player_name, amount, anti_cheat, last_check, "
-                + "last_violation_level, last_flagged_at FROM " + flagsTable;
-        try (PreparedStatement statement = connection.prepareStatement(sql);
-             ResultSet rs = statement.executeQuery()) {
-            while (rs.next()) {
-                UUID uuid = parseUuid(rs.getString("player_uuid"));
-                if (uuid == null) {
-                    continue;
+
+        if (summaryTable != null) {
+            String sql = "SELECT player_uuid, player_name, amount, anti_cheat, last_check, "
+                    + "last_violation_level, last_flagged_at FROM " + summaryTable;
+            try (PreparedStatement statement = connection.prepareStatement(sql);
+                 ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    UUID uuid = parseUuid(rs.getString("player_uuid"));
+                    if (uuid == null) {
+                        continue;
+                    }
+                    loaded.put(uuid, new PlayerFlags(
+                            uuid,
+                            rs.getString("player_name"),
+                            rs.getInt("amount"),
+                            rs.getString("anti_cheat"),
+                            rs.getString("last_check"),
+                            rs.getDouble("last_violation_level"),
+                            rs.getLong("last_flagged_at")));
                 }
-                loaded.put(uuid, new PlayerFlags(
-                        uuid,
-                        rs.getString("player_name"),
-                        rs.getInt("amount"),
-                        rs.getString("anti_cheat"),
-                        rs.getString("last_check"),
-                        rs.getDouble("last_violation_level"),
-                        rs.getLong("last_flagged_at")));
+            }
+        } else if (historyTable != null) {
+            // No per-player table: fold the history down ourselves so alert
+            // counts still work.
+            String sql = "SELECT player_uuid, player_name, anti_cheat, check_name, amount, "
+                    + "last_flagged_at FROM " + historyTable
+                    + " ORDER BY last_flagged_at DESC LIMIT " + HISTORY_FALLBACK_LIMIT;
+            try (PreparedStatement statement = connection.prepareStatement(sql);
+                 ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    UUID uuid = parseUuid(rs.getString("player_uuid"));
+                    if (uuid == null) {
+                        continue;
+                    }
+                    PlayerFlags existing = loaded.get(uuid);
+                    int amount = rs.getInt("amount") + (existing == null ? 0 : existing.amount());
+                    loaded.put(uuid, new PlayerFlags(
+                            uuid,
+                            rs.getString("player_name"),
+                            amount,
+                            rs.getString("anti_cheat"),
+                            rs.getString("check_name"),
+                            0.0D,
+                            Math.max(rs.getLong("last_flagged_at"),
+                                    existing == null ? 0L : existing.lastFlaggedAt())));
+                }
             }
         }
+
         summaries.clear();
         summaries.putAll(loaded);
     }
 
     private void loadChecks(Connection connection, List<UUID> online) throws Exception {
+        if (historyTable == null) {
+            return;
+        }
         StringBuilder in = new StringBuilder();
         for (int i = 0; i < online.size(); i++) {
             in.append(i == 0 ? "?" : ",?");
@@ -260,10 +367,23 @@ public final class FlagStatsHook {
     }
 
     private static UUID parseUuid(String raw) {
-        try {
-            return raw == null ? null : UUID.fromString(raw);
-        } catch (IllegalArgumentException ex) {
+        if (raw == null) {
             return null;
+        }
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException ex) {
+            // Some stores drop the dashes; rebuild them rather than lose the row.
+            String trimmed = raw.trim().replace("-", "");
+            if (trimmed.length() != 32) {
+                return null;
+            }
+            try {
+                return UUID.fromString(trimmed.replaceFirst(
+                        "(\\w{8})(\\w{4})(\\w{4})(\\w{4})(\\w{12})", "$1-$2-$3-$4-$5"));
+            } catch (IllegalArgumentException ignored) {
+                return null;
+            }
         }
     }
 
@@ -284,10 +404,24 @@ public final class FlagStatsHook {
         return checks.getOrDefault(uuid, List.of());
     }
 
-    /** Everyone on record, worst first. Includes offline players. */
     public List<PlayerFlags> topAlerts(int limit) {
         List<PlayerFlags> all = new ArrayList<>(summaries.values());
         all.sort(Comparator.comparingInt(PlayerFlags::amount).reversed());
         return all.size() <= limit ? all : new ArrayList<>(all.subList(0, limit));
+    }
+
+    /** Human-readable state, for /hs diag. */
+    public List<String> diagnostics() {
+        List<String> lines = new ArrayList<>();
+        lines.add("SUS plugin: " + (plugin.getServer().getPluginManager().getPlugin("Sus") != null
+                ? "found" : "MISSING"));
+        lines.add("Database: " + dbDescription);
+        lines.add("Connection: " + (jdbcUrl == null ? "not resolved" : "resolved"));
+        lines.add("Summary table: " + (summaryTable == null ? "none" : summaryTable));
+        lines.add("History table: " + (historyTable == null ? "none" : historyTable));
+        lines.add("Cached players: " + summaries.size());
+        lines.add("Cached check rows: " + checks.values().stream().mapToInt(List::size).sum());
+        lines.add("Last result: " + lastError);
+        return lines;
     }
 }

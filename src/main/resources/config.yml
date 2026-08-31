@@ -15,6 +15,14 @@ engage:
   # How long (ticks) after a SUS GUI click we still treat an incoming teleport
   # as "that click". SUS teleports asynchronously, so leave some slack.
   detect-window-ticks: 60
+  # Un-vanish staff when they join.
+  #
+  # PremiumVanish remembers vanish across sessions, so without this a staffer
+  # who logged out mid-escort comes back invisible with no session running and
+  # no obvious way to tell.
+  unvanish-on-join: true
+  # Delay in ticks, so this lands after PremiumVanish has restored its state.
+  unvanish-on-join-delay-ticks: 20
   # SUS 1.0.7+ split the GUI click: LEFT-click teleports, RIGHT-click dismisses
   # the flag without moving you. Leave this true so dismissing a flag doesn't
   # arm an escort. Set false only if you're on SUS 1.0.5 or older, where every
@@ -40,6 +48,16 @@ watch-list:
   # disappears from every list - which looks like "nobody is online" on a server
   # full of staff. Only turn this on if you've actually set the node up.
   respect-hide-permission: false
+
+elytra:
+  # A gliding suspect outruns anything on foot, and the leash would just
+  # rubber-band you. When the target takes off, snap to them and attach
+  # spectator POV - you see exactly what they see, which is also the best angle
+  # for judging flight cheats. Detaching manually (shift) is respected; the next
+  # takeoff re-attaches.
+  follow: true
+  # Switch to spectator automatically if you're in solid mode when they take off.
+  force-spectator: true
 
 alerts:
   # Reads alert counts and per-check breakdowns from SUS's own database
@@ -207,6 +225,15 @@ restrictions:
     - vis
     - invisible
 
+  # Clears the sidebar during a session, which hides PremiumVanish's vanish
+  # scoreboard (its ScoreboardOptions). PV redraws on its own interval, so this
+  # is reapplied every tick.
+  #
+  # It clears whatever is in the SIDEBAR slot, not only PV's - if you run
+  # another sidebar plugin, staff lose it while escorting. The permanent fix is
+  # ScoreboardOptions.Enable: false in PremiumVanish's own config.
+  hide-vanish-scoreboard: true
+
   # Cancels any attempt to UN-VANISH during a session, whatever triggers it -
   # PremiumVanish's hotbar toggle item, a staff GUI, another plugin calling the
   # API. Commands aren't the only way to become visible, so blocking /v alone
@@ -254,6 +281,8 @@ messages:
   retargeted: "<gray>Now escorting <white><target></white>.</gray>"
   released: "<gray>Escort ended. <dark_gray>(<reason>)</dark_gray>"
   target-left: "<red><target></red> left the server."
+  pov-following: "<gray>Following <white><target></white> in first person. <dark_gray>Shift to detach.</dark_gray>"
+  pov-released: "<gray>They landed. POV released.</gray>"
   mode-spectator: "<aqua>Spectator.</aqua> <dark_gray>You pass through blocks; nobody can see you.</dark_gray>"
   mode-active: "<green><mode>.</green> <dark_gray>Still vanished, still leashed.</dark_gray>"
   wall: "<red>Leash limit.</red> <gray>You can't get more than <yellow><radius></yellow> blocks from <white><target></white>.</gray>"

@@ -19,7 +19,7 @@ softdepend:
 commands:
   havocsus:
     description: Manage escort sessions.
-    usage: /havocsus <menu|list|quit|status|radius|reload>
+    usage: /havocsus <menu|list|quit|status|diag|radius|reload>
     aliases:
       - hs
 

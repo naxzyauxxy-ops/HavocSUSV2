@@ -93,6 +93,19 @@ There's a "Stop watching" button on that screen too, since `/escort quit` no lon
 
 If DonutPunishments is missing or its file is unreadable, `punish.fallback-reasons` in HavocSus's config is used instead.
 
+## If the checks page is empty
+
+Run `/hs diag`. It reports whether SUS was found, which database file was opened, which tables were matched, how many rows are cached, and the last error — which turns "nothing shows" into an actual cause.
+
+Two bugs made this fail silently before 1.5.1, both mine:
+
+1. **Resolution ran once, at startup.** SUS creates its database lazily, so if no flag had ever been recorded when HavocSus enabled, alerts stayed off until a restart. It now retries every refresh cycle.
+2. **The table probe only checked the table existed, not its columns.** `SELECT * FROM flags LIMIT 1` passes as long as something called `flags` is there, so a wrong guess about column names sailed through and then made every real query throw — visible in game as an empty checks page and nothing else.
+
+Tables are now identified by the **columns they contain** rather than by name, so a table prefix, a rename, or a schema shuffle is handled. If SUS only has the per-check table, per-player counts are folded up from it.
+
+Verified against SUS 1.0.5 and 1.0.7 — their database layer is byte-identical, so either works.
+
 ## Alert counts and checks
 
 HavocSus reads alert data straight out of SUS's own database (`plugins/Sus/flags.db`), read-only. SUS exposes no API, but its SQL schema is unobfuscated — `flags` holds one row per player (`amount`, `anti_cheat`, `last_check`, `last_violation_level`) and `flag_history` holds one row per check. Column names survive obfuscation, which makes this far more durable than reflecting into their classes.
@@ -130,6 +143,26 @@ The dialog now echoes the exact command it ran and logs it, so a refusal is visi
 
 - **The staff member lacks `punishments.punish`.** Set `punish.run-as-console: true` if you'd rather not grant it, at the cost of the punishment being attributed to console.
 - **The target holds `punishments.exempt`.** This bites the same way `havocsus.hidefromlist` did: any wildcard (`*` or `punishments.*` in LuckPerms) matches it, so testing on another staff account will silently refuse the ban. Test on a non-staff account, or check the target's permissions.
+
+## The PremiumVanish sidebar
+
+`restrictions.hide-vanish-scoreboard` (on by default) clears the sidebar during a session, which hides PV's vanish scoreboard. It clears whatever is in that slot, not only PV's, so if you run another sidebar plugin staff lose it for the duration. The permanent alternative is `ScoreboardOptions.Enable: false` in PremiumVanish's own config.
+
+Avoid the `pv.scoreboard` permission route — `ScoreboardOptions.Permission: true` only helps if your staff *don't* hold a wildcard, and yours do.
+
+## Vanish timing
+
+Staff are vanished **before** the teleport, not after it lands. Vanishing a tick later meant the suspect got a frame or two of someone popping in beside them.
+
+The "was already vanished" snapshot is taken before that early vanish and carried into the session. Reading it afterwards would always say "already vanished" and leave staff stuck invisible when the session ended.
+
+`engage.unvanish-on-join` (on by default) un-vanishes staff when they join, 20 ticks after login so it lands after PremiumVanish restores its own state. Without it, a staffer who logged out mid-escort comes back invisible with no session running.
+
+## Elytra follow
+
+When the watched player starts gliding, HavocSus snaps to them and attaches **spectator POV** — you see exactly what they see, which is also the best angle for judging flight cheats. The leash would otherwise just rubber-band you while they flew off.
+
+It attaches once per glide. Detaching manually with shift is respected rather than re-attached a tick later; their next takeoff re-arms it. Landing releases POV automatically. `elytra.force-spectator` switches you out of solid mode on takeoff.
 
 ## Leaving spectator
 

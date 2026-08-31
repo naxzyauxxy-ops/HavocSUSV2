@@ -35,6 +35,8 @@ public final class Settings {
         DEFAULT_MESSAGES.put("retargeted", "<gray>Now escorting <white><target></white>.</gray>");
         DEFAULT_MESSAGES.put("released", "<gray>Escort ended. <dark_gray>(<reason>)</dark_gray>");
         DEFAULT_MESSAGES.put("target-left", "<red><target></red> left the server.");
+        DEFAULT_MESSAGES.put("pov-following", "<gray>Following <white><target></white> in first person. <dark_gray>Shift to detach.</dark_gray>");
+        DEFAULT_MESSAGES.put("pov-released", "<gray>They landed. POV released.</gray>");
         DEFAULT_MESSAGES.put("mode-spectator", "<aqua>Spectator.</aqua> <dark_gray>You pass through blocks; nobody can see you.</dark_gray>");
         DEFAULT_MESSAGES.put("mode-active", "<green><mode>.</green> <dark_gray>Still vanished, still leashed.</dark_gray>");
         DEFAULT_MESSAGES.put("wall", "<red>Leash limit.</red> <gray>You can't get more than <yellow><radius></yellow> blocks from <white><target></white>.</gray>");
@@ -76,6 +78,10 @@ public final class Settings {
     public boolean registerSusIfAbsent = true;
     public Set<String> susPassthroughArgs = new HashSet<>();
     public boolean ignoreRightClick = true;
+    public boolean unvanishOnJoin = true;
+    public long unvanishOnJoinDelay = 20L;
+    public boolean elytraFollow = true;
+    public boolean elytraForceSpectator = true;
 
     public boolean punishEnabled = true;
 
@@ -102,6 +108,7 @@ public final class Settings {
     public boolean blockItemPickup = true;
     public boolean lockGameMode = true;
     public boolean lockVanish = true;
+    public boolean hideVanishScoreboard = true;
     public Set<String> allowedCommands = new HashSet<>();
     public Set<String> alwaysDeniedCommands = new HashSet<>();
 
@@ -138,6 +145,10 @@ public final class Settings {
             }
         }
         ignoreRightClick = c.getBoolean("engage.ignore-right-click", true);
+        unvanishOnJoin = c.getBoolean("engage.unvanish-on-join", true);
+        unvanishOnJoinDelay = Math.max(1L, c.getLong("engage.unvanish-on-join-delay-ticks", 20L));
+        elytraFollow = c.getBoolean("elytra.follow", true);
+        elytraForceSpectator = c.getBoolean("elytra.force-spectator", true);
         punishEnabled = c.getBoolean("punish.enabled", true);
 
         radius = Math.max(8.0D, c.getDouble("leash.radius", 150.0D));
@@ -160,6 +171,7 @@ public final class Settings {
         blockItemPickup = c.getBoolean("restrictions.block-item-pickup", true);
         lockGameMode = c.getBoolean("restrictions.lock-gamemode", true);
         lockVanish = c.getBoolean("restrictions.lock-vanish", true);
+        hideVanishScoreboard = c.getBoolean("restrictions.hide-vanish-scoreboard", true);
 
         alwaysDeniedCommands = new HashSet<>();
         List<String> denied = c.getStringList("restrictions.always-denied-commands");

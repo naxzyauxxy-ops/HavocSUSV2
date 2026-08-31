@@ -21,6 +21,7 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerGameModeChangeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
@@ -393,6 +394,27 @@ public final class EscortListener implements Listener {
     // ------------------------------------------------------------------
     // teardown
     // ------------------------------------------------------------------
+
+    /**
+     * Staff should land in the world visible, not silently invisible from a
+     * previous session. PremiumVanish restores vanish state on join, so this
+     * runs a moment later to undo it.
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onJoin(PlayerJoinEvent event) {
+        if (!plugin.settings().unvanishOnJoin) {
+            return;
+        }
+        Player player = event.getPlayer();
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            if (!player.isOnline() || plugin.escorts().isEscorting(player)) {
+                return;
+            }
+            if (plugin.vanish().isVanished(player)) {
+                plugin.vanish().show(player);
+            }
+        }, Math.max(1L, plugin.settings().unvanishOnJoinDelay));
+    }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {

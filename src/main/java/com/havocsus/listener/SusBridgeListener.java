@@ -135,18 +135,7 @@ public final class SusBridgeListener implements Listener {
         }
 
         event.setCancelled(true);
-
-        final Player watched = target;
-        Location origin = staff.getLocation().clone();
-
-        EscortSession existing = plugin.escorts().session(staff);
-        if (existing != null) {
-            existing.allowNextTeleport();
-        }
-        plugin.escorts().clearPending(staff);
-
-        staff.teleport(watched.getLocation());
-        plugin.escorts().engage(staff, watched, origin);
+        plugin.startWatch(staff, target);
     }
 
     /**
@@ -166,6 +155,7 @@ public final class SusBridgeListener implements Listener {
             return;
         }
         UUID targetId = pending.target();
+        final boolean pendingWasVanished = pending.wasVanished();
 
         // getFrom() is the exact spot they stood in before SUS moved them, which
         // is what /escort quit should return them to. Falling back to the
@@ -183,7 +173,7 @@ public final class SusBridgeListener implements Listener {
             if (existing != null) {
                 existing.consumeTeleportPass();
             }
-            plugin.escorts().engage(staff, target, origin);
+            plugin.escorts().engage(staff, target, origin, pendingWasVanished);
         });
     }
 }

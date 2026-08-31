@@ -28,6 +28,8 @@ public final class EscortSession {
 
     private Mode mode = Mode.SPECTATOR;
     private long lastSneakMs;
+    /** True once we've attached POV for the target's current glide. */
+    private boolean povArmed;
     private long lastWallMessageMs;
 
     /**
@@ -102,6 +104,14 @@ public final class EscortSession {
 
     public void mode(Mode mode) {
         this.mode = mode;
+    }
+
+    public boolean povArmed() {
+        return povArmed;
+    }
+
+    public void povArmed(boolean value) {
+        this.povArmed = value;
     }
 
     public long lastSneakMs() {

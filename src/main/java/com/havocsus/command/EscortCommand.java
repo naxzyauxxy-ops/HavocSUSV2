@@ -75,6 +75,25 @@ public final class EscortCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        if (sub.equals("diag") || sub.equals("debug")) {
+            if (!staff.hasPermission("havocsus.admin")) {
+                staff.sendMessage(plugin.settings().msg("no-permission"));
+                return true;
+            }
+            staff.sendMessage(net.kyori.adventure.text.Component.text("HavocSus diagnostics:"));
+            for (String line : plugin.flagStats().diagnostics()) {
+                staff.sendMessage(net.kyori.adventure.text.Component.text("  " + line));
+            }
+            staff.sendMessage(net.kyori.adventure.text.Component.text(
+                    "  Punish reasons loaded: " + plugin.punishments().reasons().size()));
+            staff.sendMessage(net.kyori.adventure.text.Component.text(
+                    "  Ban cache: " + (plugin.bans().isAvailable()
+                            ? plugin.bans().bans().size() + " entries" : "unavailable")));
+            staff.sendMessage(net.kyori.adventure.text.Component.text(
+                    "  PremiumVanish: " + (plugin.vanish().isAvailable() ? "hooked" : "missing")));
+            return true;
+        }
+
         if (sub.equals("menu") || sub.equals("dialog")) {
             plugin.openMenu(staff);
             return true;
@@ -130,7 +149,7 @@ public final class EscortCommand implements CommandExecutor, TabCompleter {
         if (args.length != 1) {
             return Collections.emptyList();
         }
-        List<String> options = new ArrayList<>(List.of("menu", "list", "quit", "status"));
+        List<String> options = new ArrayList<>(List.of("menu", "list", "quit", "status", "diag"));
         if (sender.hasPermission("havocsus.admin")) {
             options.add("reload");
             options.add("radius");

@@ -9,6 +9,8 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
@@ -23,7 +25,7 @@ public final class EscortManager {
     private static final int AIRBORNE_CHECK = 4;
 
     /** A SUS click we've seen, waiting for the teleport it triggers. */
-    public record Pending(UUID target, Location origin, long expiresAtMs) {
+    public record Pending(UUID target, Location origin, boolean wasVanished, long expiresAtMs) {
         boolean expired() {
             return System.currentTimeMillis() > expiresAtMs;
         }
@@ -61,9 +63,15 @@ public final class EscortManager {
         // Snapshot where they are NOW - they're standing in a menu, so this is
         // their real pre-teleport position and the place /escort quit sends
         // them back to.
+        // Vanish NOW, before the teleport, not after it lands. Vanishing a tick
+        // later meant the suspect got a frame or two of a staff member popping
+        // in beside them - which is exactly what they'd notice.
+        boolean wasVanished = prepareVanish(staff);
+
         pending.put(staff.getUniqueId(), new Pending(
                 target,
                 staff.getLocation().clone(),
+                wasVanished,
                 System.currentTimeMillis() + (s.detectWindowTicks * 50L)));
 
         // If they're already escorting someone, let SUS's teleport through once
@@ -121,15 +129,35 @@ public final class EscortManager {
         return out;
     }
 
+    /**
+     * Vanishes staff immediately and reports whether they were ALREADY vanished
+     * beforehand.
+     *
+     * That return value has to be carried into the session: capturing it later,
+     * after we've done the vanishing, would always read "already vanished" and
+     * staff would be left invisible when the session ended.
+     */
+    public boolean prepareVanish(Player staff) {
+        boolean wasVanished = plugin.vanish().isVanished(staff);
+        if (plugin.settings().autoVanish && !wasVanished) {
+            plugin.vanish().hide(staff);
+        }
+        return wasVanished;
+    }
+
     public void engage(Player staff, Player target) {
-        engage(staff, target, staff == null ? null : staff.getLocation());
+        engage(staff, target, staff == null ? null : staff.getLocation(), null);
+    }
+
+    public void engage(Player staff, Player target, Location origin) {
+        engage(staff, target, origin, null);
     }
 
     /**
      * @param origin pre-teleport position, used as the exit destination. Callers
      *               must supply this from before the teleport happened.
      */
-    public void engage(Player staff, Player target, Location origin) {
+    public void engage(Player staff, Player target, Location origin, Boolean preVanished) {
         if (staff == null || target == null || staff.equals(target)) {
             return;
         }
@@ -145,11 +173,16 @@ public final class EscortManager {
             return;
         }
 
-        EscortSession session = new EscortSession(staff, target.getUniqueId(), origin,
-                plugin.vanish().isVanished(staff));
+        // preVanished is the snapshot taken before we vanished them early; only
+        // fall back to reading it live when nothing captured it first.
+        boolean wasVanished = preVanished != null
+                ? preVanished
+                : prepareVanish(staff);
+
+        EscortSession session = new EscortSession(staff, target.getUniqueId(), origin, wasVanished);
         sessions.put(staff.getUniqueId(), session);
 
-        if (s.autoVanish && !session.wasAlreadyVanished()) {
+        if (s.autoVanish && !wasVanished) {
             plugin.vanish().hide(staff);
         }
 
@@ -222,6 +255,9 @@ public final class EscortManager {
 
         session.internalAction(true);
         try {
+            if (staff.getGameMode() == GameMode.SPECTATOR && staff.getSpectatorTarget() != null) {
+                staff.setSpectatorTarget(null);
+            }
             staff.setGameMode(session.previousGameMode());
             if (s.restoreLocationOnExit) {
                 Location back = session.returnLocation();
@@ -323,6 +359,12 @@ public final class EscortManager {
                 continue;
             }
 
+            handleElytra(session, staff, target);
+
+            if (s.hideVanishScoreboard) {
+                hideSidebar(staff);
+            }
+
             double distance = staffLoc.distance(targetLoc);
 
             if (distance > s.radius && !staff.hasPermission("havocsus.bypass.leash")) {
@@ -352,6 +394,85 @@ public final class EscortManager {
                         "<mode>", session.mode() == EscortSession.Mode.SPECTATOR
                                 ? "Spectator" : capitalise(s.activeGameMode.name())));
             }
+        }
+    }
+
+    /**
+     * Clears the sidebar while escorting.
+     *
+     * PremiumVanish draws a vanish sidebar (ScoreboardOptions in its config),
+     * which covers the screen during an investigation and fights our own action
+     * bar readout. PV redraws on its own interval, so this runs every tick
+     * rather than once.
+     *
+     * Note this clears whatever is in the SIDEBAR slot, not just PV's - if you
+     * run another sidebar plugin, staff lose it for the duration of a session.
+     * The permanent alternative is ScoreboardOptions.Enable: false in
+     * PremiumVanish's own config.
+     */
+    private void hideSidebar(Player staff) {
+        try {
+            Objective objective = staff.getScoreboard().getObjective(DisplaySlot.SIDEBAR);
+            if (objective != null) {
+                objective.setDisplaySlot(null);
+            }
+        } catch (Throwable ignored) {
+            // scoreboard APIs are best-effort here; never break the tick
+        }
+    }
+
+    /**
+     * Elytra follow.
+     *
+     * A gliding suspect outruns anything on foot, and the leash would just
+     * rubber-band staff uselessly. So when the target starts gliding we snap to
+     * them and attach spectator POV - you see exactly what they see, which is
+     * also the most useful angle for judging flight cheats.
+     *
+     * Attaching happens once per glide. If staff detach manually (shift), we
+     * don't fight them and re-attach a tick later; the next takeoff re-arms it.
+     */
+    private void handleElytra(EscortSession session, Player staff, Player target) {
+        Settings s = plugin.settings();
+        if (!s.elytraFollow) {
+            return;
+        }
+        boolean gliding = target.isGliding();
+
+        if (gliding && !session.povArmed()) {
+            if (session.mode() != EscortSession.Mode.SPECTATOR) {
+                if (!s.elytraForceSpectator) {
+                    return;
+                }
+                applyMode(staff, session, EscortSession.Mode.SPECTATOR, false);
+            }
+            teleportInternal(session, staff, target.getLocation());
+            setSpectatorTarget(session, staff, target);
+            session.povArmed(true);
+            staff.sendMessage(s.msg("pov-following", "<target>", target.getName()));
+            return;
+        }
+
+        if (!gliding && session.povArmed()) {
+            session.povArmed(false);
+            if (staff.getGameMode() == GameMode.SPECTATOR && staff.getSpectatorTarget() != null) {
+                setSpectatorTarget(session, staff, null);
+                staff.sendMessage(s.msg("pov-released"));
+            }
+        }
+    }
+
+    private void setSpectatorTarget(EscortSession session, Player staff, Player target) {
+        session.internalAction(true);
+        try {
+            // Only legal in spectator; guard rather than let it throw mid-tick.
+            if (staff.getGameMode() == GameMode.SPECTATOR) {
+                staff.setSpectatorTarget(target);
+            }
+        } catch (Throwable t) {
+            plugin.getLogger().warning("Could not attach spectator POV: " + t);
+        } finally {
+            session.internalAction(false);
         }
     }
 
